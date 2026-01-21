@@ -31,34 +31,6 @@ git --version
 git clone <URL_DO_REPOSITORIO>
 cd backend-classificador-politicas-publicas-2023102400
 ```
-
----
-
-## Criando o ambiente virtual (venv)
-
-O uso de `venv` é recomendado para desenvolvimento local sem Docker.
-
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-Para desativar o ambiente virtual:
-
-```bash
-deactivate
-```
-
----
-
-## Instalando dependências (opcional, sem Docker)
-
-Caso queira rodar o projeto localmente sem Docker:
-
-```bash
-pip install -r requirements.txt
-```
-
 ---
 
 ## Subindo o projeto com Docker
