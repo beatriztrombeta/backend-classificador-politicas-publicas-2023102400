@@ -63,7 +63,6 @@ docker-compose.override.yml
 docker-compose.dev.yml
 
 # Volumes, configs locais, dados persistentes
-data/
 postgres_data/
 pgdata/
 csvdata/
