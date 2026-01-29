@@ -176,6 +176,11 @@ class UserCreateForm:
             disciplinas,
         )
 
+class UserCreateResponse(BaseModel):
+    id: int = Field(..., description="Unique identifier for user")
+    email: EmailStr = Field(..., description="Institutional email of the user")
+    status: StatusCadastroEnum = Field(..., description="User registration status")
+
 async def validate_file(file: UploadFile) -> None:
     threshold = 5 * 1024 * 1024 # 5 MB
     
@@ -233,7 +238,7 @@ def insert_base_user(new_user: UserBase, db: Session) -> User:
             cpf=new_user.cpf,
             telefone=new_user.telefone,
             status_cadastro=StatusCadastroEnum.PENDENTE,
-            #id_campus=new_user.campus_id
+            id_campus=new_user.campus_id
         )
     
     db.add(user)
@@ -258,10 +263,10 @@ def insert_usuario_aluno(new_user: UserAluno, db: Session) -> models.UserAluno:
 def insert_usuario_professor(new_user: UserProfessor, db: Session) -> models.UserProfessor:
     base_user = insert_base_user(new_user, db)
 
-    # TODO: Adicionar o campo id_curso e talvez as disciplinas que o professor leciona
+    # TODO: talvez as disciplinas que o professor leciona
     user = models.UserProfessor(
         id_usuario=base_user.id_usuario,
-        #id_curso=new_user.curso_id
+        id_curso=new_user.curso_id
     )
 
     db.add(user)
@@ -272,10 +277,9 @@ def insert_usuario_professor(new_user: UserProfessor, db: Session) -> models.Use
 def insert_usuario_coordenador(new_user: UserCoordenacao, db: Session) -> models.UserCoordenador:
     base_user = insert_base_user(new_user, db)
 
-    # TODO: Adicionar o campo id_curso
     user = models.UserCoordenador(
         id_usuario=base_user.id_usuario,
-        #id_curso=new_user.curso_id
+        id_curso=new_user.curso_id
     )
 
     db.add(user)
@@ -286,10 +290,9 @@ def insert_usuario_coordenador(new_user: UserCoordenacao, db: Session) -> models
 def insert_usuario_departamento(new_user: UserDepartamento, db: Session) -> models.UserDepartamento:
     base_user = insert_base_user(new_user, db)
 
-    # TODO: Adicionar o campo id_departamento
     user = models.UserDepartamento(
         id_usuario=base_user.id_usuario,
-        #id_departamento=new_user.departamento_id
+        id_departamento=new_user.departamento_id
     )
 
     db.add(user)
@@ -316,26 +319,38 @@ create_user_functions = {
 def email_already_exists(email: str, db: Session) -> bool:
     return db.query(User).filter(User.email == email).first()
 
-@router.post("")
+@router.post("", response_model=UserCreateResponse)
 async def create_new_user(
         form: UserCreateForm = Depends(UserCreateForm.as_form),
         file: UploadFile = File(...),
         db: Session = Depends(get_db)
     ):
-    data = {k: v for k, v in vars(form).items() if v is not None}
+    try:
+        data = {k: v for k, v in vars(form).items() if v is not None}
 
-    new_user = TypeAdapter(UserCreate).validate_python(data)
+        new_user = TypeAdapter(UserCreate).validate_python(data)
 
-    if email_already_exists(new_user.email, db):
-        raise HTTPException(status_code=409, detail="A user with this email address already exists.")
+        if email_already_exists(new_user.email, db):
+            raise HTTPException(status_code=409, detail="A user with this email address already exists.")
 
-    # Create a user in the database
-    created_user = create_user_functions[new_user.categoria](new_user, db)
+        # Create a user in the database
+        created_user = create_user_functions[new_user.categoria](new_user, db)
 
-    # Save file to server
-    await validate_file(file)
-    filename = await save_file(file)
+        # Save file to server
+        await validate_file(file)
+        filename = await save_file(file)
 
-    # Create a document in the database
+        # Create a document in the database
 
-    return created_user
+        res = UserCreateResponse(
+            id=created_user.id_usuario,
+            email=new_user.email,
+            status=StatusCadastroEnum.PENDENTE
+        )
+
+        db.commit()
+
+        return res 
+    except Exception:
+        db.rollback()
+        raise
