@@ -57,8 +57,6 @@ Após subir os containers:
 * API: [http://localhost:8000](http://localhost:8000)
 * Documentação automática (Swagger):
   [http://localhost:8000/docs](http://localhost:8000/docs)
-* Endpoint de verificação de status:
-  [http://localhost:8000/health](http://localhost:8000/health)
 
 ---
 
