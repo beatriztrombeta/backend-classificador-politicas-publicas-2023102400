@@ -7,6 +7,12 @@ import re
 from pathlib import Path
 import os
 import uuid
+from app.models import User, UserProfile, StatusCadastroEnum
+from sqlalchemy.orm import Session
+from app.database import get_db
+
+# TODO: Melhorar esse import
+from app import models
 
 router = APIRouter(
     prefix="/users",
@@ -82,7 +88,7 @@ class UserDepartamento(UserBase):
     categoria: Literal[CategoriaEnum.DEPARTAMENTO]
     departamento_id: int = Field(..., description="Unique identifier for a 'departamento' already registered on the system")
 
-class UserCoordenacao(UserDepartamento):
+class UserCoordenacao(UserBase):
     categoria: Literal[CategoriaEnum.COORDENACAO]
     curso_id: int = Field(..., description="Unique identifier for a 'curso' already registered on the system")
 
@@ -205,27 +211,131 @@ async def save_file(file: UploadFile) -> str:
 
     return filename
 
+def insert_user_profile(name: str, description: str, db: Session) -> UserProfile:
+    profile = UserProfile(
+        nome_perfil=name,
+        descricao=description
+    )
+    
+    db.add(profile)
+    db.flush()
+
+    return profile
+
+def insert_base_user(new_user: UserBase, db: Session) -> User:
+    profile = insert_user_profile(new_user.nome, description="", db=db)
+
+    # TODO: Resgatar o id da unidade
+    user = User(
+            id_perfil=profile.id_perfil,
+            nome=new_user.nome,
+            email=new_user.email,
+            cpf=new_user.cpf,
+            telefone=new_user.telefone,
+            status_cadastro=StatusCadastroEnum.PENDENTE,
+            #id_campus=new_user.campus_id
+        )
+    
+    db.add(user)
+    db.flush()
+
+    return user
+
+def insert_usuario_aluno(new_user: UserAluno, db: Session) -> models.UserAluno:
+    base_user = insert_base_user(new_user, db)
+    
+    # TODO: Adicionar o campo id_aluno_graduacao e talvez adicionar o campo RA no futuro
+    user = models.UserAluno(
+        id_usuario=base_user.id_usuario,
+        #id_aluno_graduacao=new_user.ra
+    )
+
+    db.add(user)
+    db.flush()
+
+    return user
+
+def insert_usuario_professor(new_user: UserProfessor, db: Session) -> models.UserProfessor:
+    base_user = insert_base_user(new_user, db)
+
+    # TODO: Adicionar o campo id_curso e talvez as disciplinas que o professor leciona
+    user = models.UserProfessor(
+        id_usuario=base_user.id_usuario,
+        #id_curso=new_user.curso_id
+    )
+
+    db.add(user)
+    db.flush()
+
+    return user
+
+def insert_usuario_coordenador(new_user: UserCoordenacao, db: Session) -> models.UserCoordenador:
+    base_user = insert_base_user(new_user, db)
+
+    # TODO: Adicionar o campo id_curso
+    user = models.UserCoordenador(
+        id_usuario=base_user.id_usuario,
+        #id_curso=new_user.curso_id
+    )
+
+    db.add(user)
+    db.flush()
+
+    return user
+
+def insert_usuario_departamento(new_user: UserDepartamento, db: Session) -> models.UserDepartamento:
+    base_user = insert_base_user(new_user, db)
+
+    # TODO: Adicionar o campo id_departamento
+    user = models.UserDepartamento(
+        id_usuario=base_user.id_usuario,
+        #id_departamento=new_user.departamento_id
+    )
+
+    db.add(user)
+    db.flush()
+
+    return user
+
+# TODO: Aguardar essas duas entidades serem criadas no banco para terminar a funcao
+def insert_usuario_pro_reitor(new_user: UserProReitor, db: Session):
+    pass
+
+def insert_usuario_reitor(new_user: UserReitor, db: Session):
+    pass
+
+create_user_functions = {
+    CategoriaEnum.ALUNO: insert_usuario_aluno,
+    CategoriaEnum.PROFESSOR: insert_usuario_professor,
+    CategoriaEnum.COORDENACAO: insert_usuario_coordenador,
+    CategoriaEnum.DEPARTAMENTO: insert_usuario_departamento,
+    CategoriaEnum.PRO_REITORIA: insert_usuario_pro_reitor,
+    CategoriaEnum.REITORIA: insert_usuario_reitor
+}
+
+def email_already_exists(email: str, db: Session) -> bool:
+    return db.query(User).filter(User.email == email).first()
+
 @router.post("")
 async def create_new_user(
         form: UserCreateForm = Depends(UserCreateForm.as_form),
-        file: UploadFile = File(...)
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db)
     ):
     data = {k: v for k, v in vars(form).items() if v is not None}
 
-    user = TypeAdapter(UserCreate).validate_python(data)
+    new_user = TypeAdapter(UserCreate).validate_python(data)
+
+    if email_already_exists(new_user.email, db):
+        raise HTTPException(status_code=409, detail="A user with this email address already exists.")
+
+    # Create a user in the database
+    created_user = create_user_functions[new_user.categoria](new_user, db)
 
     # Save file to server
     await validate_file(file)
     filename = await save_file(file)
 
-    # Create a user in the database
+    # Create a document in the database
 
-
-
-    return {
-        "tipo_modelo": type(user).__name__,
-        "categoria": user.categoria,
-        "arquivo_tipo": file.content_type,
-        "arquivo_filename": file.filename, 
-        "arquivo": file.size
-    }
+    return created_user
