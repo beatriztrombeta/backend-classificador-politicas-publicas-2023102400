@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.ext.declarative import declarative_base
+from app.models.base import Base
 from enum import Enum
 
 class StatusCadastroEnum(str, Enum):
@@ -12,8 +12,6 @@ class StatusAnaliseEnum(str, Enum):
     PENDENTE='PENDENTE'
     APROVADO='APROVADO'
     REJEITADO='REJEITADO'
-
-Base = declarative_base()
 
 class User(Base):
     __tablename__ = "usuario"
