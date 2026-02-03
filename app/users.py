@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 import os
 import uuid
-from app.models import User, UserProfile, StatusCadastroEnum
+from app.models import User, UserProfile, StatusCadastroEnum, Unidade
 from sqlalchemy.orm import Session
 from app.database import get_db
 
@@ -32,7 +32,7 @@ class UserBase(BaseModel):
     email: EmailStr = Field(..., description="Institutional email of the user")
     cpf: str = Field(..., description="CPF of the user")
     telefone: str = Field(..., description="Phone number of the user, with only de DDD and number, with the format (xx) xxxxx-xxxx or (xx) xxxx-xxxx")
-    campus_id: int = Field(..., description="Unique identifier for a 'campus' already registered on the system")
+    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
 
     @field_validator("email")
     @classmethod
@@ -126,7 +126,7 @@ class UserCreateForm:
         email: EmailStr,
         cpf: str,
         telefone: str,
-        campus_id: int,
+        unidade_id: int,
         categoria: CategoriaEnum,
         ra: Optional[str] = None,
         area_id: Optional[int] = None,
@@ -138,7 +138,7 @@ class UserCreateForm:
         self.email = email
         self.cpf = cpf
         self.telefone = telefone
-        self.campus_id = campus_id
+        self.unidade_id = unidade_id
         self.categoria = categoria
         self.ra = ra
         self.area_id = area_id
@@ -153,7 +153,7 @@ class UserCreateForm:
         email: EmailStr = Form(...),
         cpf: str = Form(...),
         telefone: str = Form(...),
-        campus_id: int = Form(...),
+        unidade_id: int = Form(...),
         categoria: CategoriaEnum = Form(...),
 
         ra: Optional[str] = Form(None),
@@ -167,7 +167,7 @@ class UserCreateForm:
             email,
             cpf,
             telefone,
-            campus_id,
+            unidade_id,
             categoria,
             ra,
             area_id,
@@ -200,7 +200,13 @@ async def validate_file(file: UploadFile) -> None:
     if file.size > threshold:
         raise HTTPException(status_code=422, detail="The file exceeds 5 MB.")
 
-async def save_file(file: UploadFile) -> str:
+class SavedFile(BaseModel):
+    filename: str
+    size: int
+    mime_type: str
+    base_path: Path
+
+async def save_file(file: UploadFile) -> SavedFile:
     base_dir = Path(os.getenv("FILES_PATH"))
     base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -214,31 +220,33 @@ async def save_file(file: UploadFile) -> str:
     with open(file_path, "wb") as f:
         f.write(content)
 
-    return filename
-
-def insert_user_profile(name: str, description: str, db: Session) -> UserProfile:
-    profile = UserProfile(
-        nome_perfil=name,
-        descricao=description
+    return SavedFile(
+        filename=filename,
+        size=len(content),
+        mime_type=file.content_type,
+        base_path=base_dir
     )
-    
-    db.add(profile)
-    db.flush()
 
-    return profile
+def insert_base_user(new_user: UserBase, categoria: CategoriaEnum, db: Session) -> User:
+    unidade = db.query(Unidade).filter(Unidade.id_unidade == new_user.unidade_id).first()
 
-def insert_base_user(new_user: UserBase, db: Session) -> User:
-    profile = insert_user_profile(new_user.nome, description="", db=db)
+    if not unidade:
+        raise HTTPException(
+            status_code=404,
+            detail="Unidade not found"
+        )
+
 
     # TODO: Resgatar o id da unidade
     user = User(
-            id_perfil=profile.id_perfil,
+            id_perfil=categoria,
             nome=new_user.nome,
             email=new_user.email,
             cpf=new_user.cpf,
             telefone=new_user.telefone,
             status_cadastro=StatusCadastroEnum.PENDENTE,
-            id_campus=new_user.campus_id
+            id_campus=unidade.id_campus,
+            id_unidade=unidade.id_unidade
         )
     
     db.add(user)
@@ -247,7 +255,7 @@ def insert_base_user(new_user: UserBase, db: Session) -> User:
     return user
 
 def insert_usuario_aluno(new_user: UserAluno, db: Session) -> models.UserAluno:
-    base_user = insert_base_user(new_user, db)
+    base_user = insert_base_user(new_user, new_user.categoria, db)
     
     # TODO: Adicionar o campo id_aluno_graduacao e talvez adicionar o campo RA no futuro
     user = models.UserAluno(
@@ -261,7 +269,7 @@ def insert_usuario_aluno(new_user: UserAluno, db: Session) -> models.UserAluno:
     return user
 
 def insert_usuario_professor(new_user: UserProfessor, db: Session) -> models.UserProfessor:
-    base_user = insert_base_user(new_user, db)
+    base_user = insert_base_user(new_user, new_user.categoria, db)
 
     # TODO: talvez as disciplinas que o professor leciona
     user = models.UserProfessor(
@@ -275,7 +283,7 @@ def insert_usuario_professor(new_user: UserProfessor, db: Session) -> models.Use
     return user
 
 def insert_usuario_coordenador(new_user: UserCoordenacao, db: Session) -> models.UserCoordenador:
-    base_user = insert_base_user(new_user, db)
+    base_user = insert_base_user(new_user, new_user.categoria, db)
 
     user = models.UserCoordenador(
         id_usuario=base_user.id_usuario,
@@ -288,7 +296,7 @@ def insert_usuario_coordenador(new_user: UserCoordenacao, db: Session) -> models
     return user
 
 def insert_usuario_departamento(new_user: UserDepartamento, db: Session) -> models.UserDepartamento:
-    base_user = insert_base_user(new_user, db)
+    base_user = insert_base_user(new_user, new_user.categoria, db)
 
     user = models.UserDepartamento(
         id_usuario=base_user.id_usuario,
@@ -319,6 +327,24 @@ create_user_functions = {
 def email_already_exists(email: str, db: Session) -> bool:
     return db.query(User).filter(User.email == email).first()
 
+def insert_documento_usuario(saved_file: SavedFile, usuario_id: int, db: Session) -> models.DocumentoUsuario:
+    document = models.DocumentoUsuario(
+        id_usuario =usuario_id, 
+        tipo_documento = "COMPROVANTE_VINCULO",
+        storage_provider = "LOCAL",
+        storage_bucket = "local-documents",
+        storage_key = str(saved_file.base_path / saved_file.filename),
+        hash_arquivo = "hash_fake_comp_456",
+        mime_type = saved_file.mime_type,
+        tamanho_arquivo = saved_file.size,
+        status_analise = models.StatusAnaliseEnum.PENDENTE
+    )
+
+    db.add(document)
+    db.flush()
+
+    return document
+
 @router.post("", response_model=UserCreateResponse)
 async def create_new_user(
         form: UserCreateForm = Depends(UserCreateForm.as_form),
@@ -338,9 +364,11 @@ async def create_new_user(
 
         # Save file to server
         await validate_file(file)
-        filename = await save_file(file)
+        saved_file = await save_file(file)
 
         # Create a document in the database
+        insert_documento_usuario(saved_file, created_user.id_usuario, db)
+
 
         res = UserCreateResponse(
             id=created_user.id_usuario,

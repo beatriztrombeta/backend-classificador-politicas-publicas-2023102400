@@ -8,6 +8,11 @@ class StatusCadastroEnum(str, Enum):
     APROVADO='APROVADO'
     REJEITADO='REJEITADO'
 
+class StatusAnaliseEnum(str, Enum):
+    PENDENTE='PENDENTE'
+    APROVADO='APROVADO'
+    REJEITADO='REJEITADO'
+
 Base = declarative_base()
 
 class User(Base):
@@ -99,3 +104,26 @@ class Departamento(Base):
     id_departamento = Column(Integer, primary_key=True, index=True)
     id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
     nome_departamento = Column(String, nullable=False)
+
+class DocumentoUsuario(Base):
+    __tablename__ = "documento_usuario"
+
+
+    id_documento = Column(Integer, primary_key=True, index=True)
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
+    tipo_documento = Column(String, nullable=False)
+    storage_provider = Column(String, nullable=False)
+    storage_bucket = Column(String)
+    storage_key = Column(String, nullable=False)
+    hash_arquivo = Column(String, nullable=False)
+    mime_type = Column(String)
+    tamanho_arquivo = Column(Integer)
+    data_envio = Column(TIMESTAMP)
+    status_analise = Column(
+        SQLEnum(
+            StatusAnaliseEnum,
+            name="status_analise_enum",
+            native_enum=True,
+            create_type=False
+        ),
+        nullable=False)
