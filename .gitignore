@@ -66,6 +66,7 @@ docker-compose.dev.yml
 postgres_data/
 pgdata/
 csvdata/
+files/
 
 # ---------------------------------------
 # VSCode / IDEs
