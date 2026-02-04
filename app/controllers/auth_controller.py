@@ -1,8 +1,16 @@
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.models import User
-from app.utils.auth import generate_code, store_code, verify_code, create_jwt_token, register_failed_attempt, reset_attempts
-from app.utils.email_service import send_email
+
+from app.models.user_model import User
+from app.utils.auth import (
+    generate_code,
+    store_code,
+    verify_code,
+    create_jwt_token,
+    register_failed_attempt,
+    reset_attempts
+)
+from app.utils.email_service import EmailService
 from app.services.email_validation_service import (
     EmailValidationService,
     InvalidEmailError,
@@ -10,6 +18,7 @@ from app.services.email_validation_service import (
 )
 
 email_validation_service = EmailValidationService()
+email_service = EmailService()
 
 def send_login_code(email: str, db: Session):
     try:
@@ -31,7 +40,12 @@ def send_login_code(email: str, db: Session):
 
     code = generate_code()
     store_code(email, code)
-    send_email(email, "Seu código de verificação", f"Seu código é: {code}")
+
+    email_service.send_email(
+        email,
+        "Seu código de verificação",
+        f"Seu código é: {code}"
+    )
 
     return {"message": "Código enviado com sucesso."}
 
@@ -51,5 +65,7 @@ def validate_login_code(email: str, code: str):
     reset_attempts(email)
     token = create_jwt_token(email)
 
-    return {"access_token": token}
-
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
