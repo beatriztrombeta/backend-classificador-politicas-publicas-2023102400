@@ -6,7 +6,7 @@ from app.controllers.auth_controller import (
     validate_login_code
 )
 from app.schemas.login_schema import UserLogin, VerifyCode
-from app.controllers.admin_approval_controller import (
+from app.controllers.admin_controller import (
     approve_user,
     reject_user
 )
