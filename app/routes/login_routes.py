@@ -6,10 +6,6 @@ from app.controllers.auth_controller import (
     validate_login_code
 )
 from app.schemas.login_schema import UserLogin, VerifyCode
-from app.controllers.admin_controller import (
-    approve_user,
-    reject_user
-)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
