@@ -1,12 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
-
+from app.database import get_db
 from app.controllers.auth_controller import (
     send_login_code,
     validate_login_code
 )
 from app.schemas.login_schema import UserLogin, VerifyCode
-from app.database import get_db
+from app.controllers.admin_approval_controller import (
+    approve_user,
+    reject_user
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -32,7 +35,6 @@ def verify_code_endpoint(data: VerifyCode, response: Response):
     )
 
     return {"message": "Login bem-sucedido."}
-
 
 @router.post("/logout")
 def logout(response: Response):

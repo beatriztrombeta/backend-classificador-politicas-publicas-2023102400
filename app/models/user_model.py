@@ -17,8 +17,7 @@ class User(Base):
     __tablename__ = "usuario"
 
     id_usuario = Column(Integer, primary_key=True, index=True)
-    id_perfil = Column(Integer, ForeignKey("perfil_usuario.id_perfil"), nullable=False)
-    id_campus = Column(Integer, ForeignKey("campus.id_campus"))
+    id_categoria_usuario = Column(Integer, ForeignKey("perfil_usuario.id_categoria_usuario"), nullable=False)
     id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"))
 
     nome = Column(String, nullable=False)
@@ -40,7 +39,7 @@ class User(Base):
 class UserProfile(Base):
     __tablename__ = "perfil_usuario"
 
-    id_perfil = Column(Integer, primary_key=True, index=True)
+    id_categoria_usuario = Column(Integer, primary_key=True, index=True)
     nome_perfil = Column(String, nullable=False)
     descricao = Column(String)
 

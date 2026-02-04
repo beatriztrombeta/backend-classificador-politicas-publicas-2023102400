@@ -67,6 +67,7 @@ postgres_data/
 pgdata/
 csvdata/
 files/
+storage/
 
 # ---------------------------------------
 # VSCode / IDEs
