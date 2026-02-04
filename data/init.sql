@@ -4,8 +4,7 @@
 
 CREATE TYPE status_cadastro_enum AS ENUM (
   'PENDENTE',
-  'APROVADO_IA',
-  'APROVADO_ADMIN',
+  'APROVADO',
   'REJEITADO'
 );
 
