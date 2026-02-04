@@ -28,16 +28,36 @@ class UserRepository:
         return db.query(User).filter(User.email == email).first() is not None
     
     @staticmethod
+    def get_by_id(db: Session, user_id: int) -> Optional[User]:
+        """Busca um usuário pelo ID"""
+        return db.query(User).filter(User.id_usuario == user_id).first()
+    
+    @staticmethod
+    def get_admin_users(db: Session) -> list[User]:
+        """Busca todos os usuários administradores (categoria_usuario = 1)"""
+        # NOTA: Ajuste o valor '1' conforme o ID da categoria admin no seu banco
+        return db.query(User).filter(User.id_categoria_usuario == 1).all()
+    
+    @staticmethod
+    def update_status(db: Session, user_id: int, new_status: str):
+        """Atualiza o status de cadastro de um usuário"""
+        user = db.query(User).filter(User.id_usuario == user_id).first()
+        if user:
+            user.status_cadastro = new_status
+            db.commit()
+            db.refresh(user)
+        return user
+    
+    @staticmethod
     def create_base_user(db: Session, user_data: UserBase, categoria: CategoriaEnum, unidade: Unidade) -> User:
         """Cria o usuário base na tabela usuario"""
         user = User(
-            id_perfil=categoria,
+            id_categoria_usuario=categoria,
             nome=user_data.nome,
             email=user_data.email,
             cpf=user_data.cpf,
             telefone=user_data.telefone,
             status_cadastro=StatusCadastroEnum.PENDENTE,
-            id_campus=unidade.id_campus,
             id_unidade=unidade.id_unidade
         )
         
