@@ -17,7 +17,7 @@ class User(Base):
     __tablename__ = "usuario"
 
     id_usuario = Column(Integer, primary_key=True, index=True)
-    id_categoria_usuario = Column(Integer, ForeignKey("perfil_usuario.id_categoria_usuario"), nullable=False)
+    id_categoria_usuario = Column(Integer, ForeignKey("categoria_usuario.id_categoria_usuario"), nullable=False)
     id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"))
 
     nome = Column(String, nullable=False)
@@ -36,12 +36,11 @@ class User(Base):
     data_cadastro = Column(TIMESTAMP)
     data_atualizacao = Column(TIMESTAMP)
 
-class UserProfile(Base):
-    __tablename__ = "perfil_usuario"
+class UserCategory(Base):
+    __tablename__ = "categoria_usuario"
 
     id_categoria_usuario = Column(Integer, primary_key=True, index=True)
-    nome_perfil = Column(String, nullable=False)
-    descricao = Column(String)
+    nome_categoria = Column(String, nullable=False)
 
 class Campus(Base):
     __tablename__ = "campus"

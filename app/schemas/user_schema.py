@@ -4,6 +4,7 @@ from typing_extensions import Literal
 from enum import IntEnum
 import re
 from pathlib import Path
+from fastapi import Form
 
 class CategoriaEnum(IntEnum):
     ALUNO = 1
@@ -135,17 +136,18 @@ class UserCreateForm:
     @classmethod
     def as_form(
         cls,
-        nome: str,
-        email: EmailStr,
-        cpf: str,
-        telefone: str,
-        unidade_id: int,
-        categoria: CategoriaEnum,
-        ra: Optional[str] = None,
-        area_id: Optional[int] = None,
-        departamento_id: Optional[int] = None,
-        curso_id: Optional[int] = None,
-        disciplinas: Optional[List[int]] = None,
+        nome: str = Form(...),
+        email: EmailStr = Form(...),
+        cpf: str = Form(...),
+        telefone: str = Form(...),
+        unidade_id: int = Form(...),
+        categoria: CategoriaEnum = Form(...),
+
+        ra: Optional[str] = Form(None),
+        area_id: Optional[int] = Form(None),
+        departamento_id: Optional[int] = Form(None),
+        curso_id: Optional[int] = Form(None),
+        disciplinas: Optional[List[int]] = Form(None),
     ):
         return cls(
             nome,
