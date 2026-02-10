@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional, Union
+from typing import Optional, List
 from app.models.user_model import (
     User, Unidade, UserAluno, UserProfessor, 
     UserCoordenador, UserDepartamento, DocumentoUsuario,
@@ -54,10 +54,13 @@ class UserRepository:
     def update_status(db: Session, user_id: int, new_status: str):
         """Atualiza o status de cadastro de um usuário"""
         user = db.query(User).filter(User.id_usuario == user_id).first()
-        if user:
-            user.status_cadastro = new_status
-            db.commit()
-            db.refresh(user)
+
+        if not user:
+            raise ValueError("Usuário não encontrado")
+
+        user.status_cadastro = new_status
+        db.commit()
+        db.refresh(user)
         return user
     
     @staticmethod
@@ -288,3 +291,13 @@ class UserRepository:
         db.flush()
         
         return document
+    
+    @staticmethod
+    def list_pending_users(db: Session) -> List[User]:
+        """Lista todos os usuários que estão com o cadastro pendente"""
+        return db.query(User).filter(User.status_cadastro == StatusCadastroEnum.PENDENTE).all()
+    
+    @staticmethod
+    def list_documents(db: Session) -> List[DocumentoUsuario]:
+        """Lista todos os documentos cadastrados"""
+        return db.query(DocumentoUsuario).all()

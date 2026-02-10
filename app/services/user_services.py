@@ -1,15 +1,16 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, UploadFile
-from typing import Union
+from fastapi.responses import FileResponse
 from app.schemas.user_schema import (
     UserCreate, UserAluno, UserProfessor, UserCoordenacao,
     UserDepartamento, UserProReitor, UserReitor, CategoriaEnum,
     UserCreateResponse, SavedFile, DuplicatedDisciplinaError, DisciplinaNotFoundError,
     CursoNotFoundError, DepartamentoNotFoundError, CategoriaNotFoundError,
-    UnidadeNotFoundError, CampusNotFoundError, AlunoNotFoundError
+    UnidadeNotFoundError, CampusNotFoundError, AlunoNotFoundError,
+    UserCreateResponse, UpdateStatusCadastro, UpdateStatusCadastroResponse
 )
 from app.repositories.user_repository import UserRepository
-from app.models.user_model import StatusCadastroEnum
+from app.models.user_model import StatusCadastroEnum, DocumentoUsuario
 from app.services.file_service import FileService
 
 class UserService:
@@ -140,3 +141,33 @@ class UserService:
         except Exception:
             db.rollback()
             raise
+
+    async def list_pending_users(self, db: Session):
+        return self.repository.list_pending_users(db)
+    
+    async def list_documents(self, db: Session):
+        return self.repository.list_documents(db)
+    
+    def download_document(self, document_id: int, db: Session):
+        document = (
+            db.query(DocumentoUsuario)
+            .filter(DocumentoUsuario.id_documento == document_id)
+            .first()
+        )
+
+        if not document:
+            raise HTTPException(status_code=404, detail="Documento não encontrado")
+
+        return FileResponse(
+            path=document.storage_key,
+            media_type=document.mime_type,
+            filename=f"{document.tipo_documento}.pdf"
+    )
+
+    def approval_reject_registration(self, body: UpdateStatusCadastro, id: int, db: Session):
+        try:
+            user = self.repository.update_status(user_id=id, new_status=body.status, db=db)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+
+        return UpdateStatusCadastroResponse(id=user.id_usuario, nome=user.nome, email=user.email, status=user.status_cadastro)

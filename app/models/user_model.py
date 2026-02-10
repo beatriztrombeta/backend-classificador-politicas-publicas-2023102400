@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, DECIMAL
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.sql import func
 from app.models.base import Base
 from enum import Enum
 
@@ -105,7 +106,10 @@ class DocumentoUsuario(Base):
     hash_arquivo = Column(String, nullable=False)
     mime_type = Column(String)
     tamanho_arquivo = Column(Integer)
-    data_envio = Column(TIMESTAMP)
+    data_envio = Column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
+    )
     status_analise = Column(
         SQLEnum(
             StatusAnaliseEnum,

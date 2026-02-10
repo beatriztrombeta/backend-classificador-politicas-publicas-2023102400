@@ -5,6 +5,8 @@ from enum import Enum
 import re
 from pathlib import Path
 from fastapi import Form
+from app.models.user_model import StatusAnaliseEnum, StatusCadastroEnum
+from datetime import datetime
 
 class CategoriaEnum(str, Enum):
     ALUNO = "ALUNO"
@@ -187,6 +189,32 @@ class SavedFile(BaseModel):
     size: int
     mime_type: str
     base_path: Path
+
+class UserResponse(BaseModel):
+    id: int = Field(..., description="Unique identifier for user")
+    nome: str = Field(..., description="Name of the user")
+    email: str = Field(..., description="Institutional email of the user")
+
+class DocumentResponse(BaseModel):
+    id_documento: int = Field(..., description="Unique identifier for documento")
+    id_usuario: int = Field(..., description="Unique identifier for usuario")
+    tipo_documento: str = Field(..., description="Document type")
+    tamanho_arquivo: int = Field(..., description="Document size in bytes")
+    data_envio: datetime = Field(..., description="Upload date and time")
+    status_analise: StatusAnaliseEnum = Field(..., description="Document review status")
+
+class UpdateStatusCadastro(BaseModel):
+    status: StatusCadastroEnum = Field(..., description="User registration status")
+
+    @field_validator("status")
+    @classmethod
+    def status_nao_pode_ser_pendente(cls, value):
+        if value == StatusCadastroEnum.PENDENTE:
+            raise ValueError("Status PENDENTE não é permitido nesta rota")
+        return value
+    
+class UpdateStatusCadastroResponse(UserResponse):
+    status: StatusCadastroEnum = Field(..., description="User registration status")
 
 class UserCreationError(Exception):
     pass
