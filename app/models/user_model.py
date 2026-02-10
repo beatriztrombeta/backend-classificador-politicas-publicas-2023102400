@@ -4,22 +4,20 @@ from app.models.base import Base
 from enum import Enum
 
 class StatusCadastroEnum(str, Enum):
-    PENDENTE='PENDENTE'
-    APROVADO='APROVADO'
-    REJEITADO='REJEITADO'
+    PENDENTE = "PENDENTE"
+    APROVADO = "APROVADO"
+    REJEITADO = "REJEITADO"
 
 class StatusAnaliseEnum(str, Enum):
-    PENDENTE='PENDENTE'
-    APROVADO='APROVADO'
-    REJEITADO='REJEITADO'
+    PENDENTE = "PENDENTE"
+    APROVADO = "APROVADO"
+    REJEITADO = "REJEITADO"
 
 class User(Base):
     __tablename__ = "usuario"
 
     id_usuario = Column(Integer, primary_key=True, index=True)
     id_categoria_usuario = Column(Integer, ForeignKey("categoria_usuario.id_categoria_usuario"), nullable=False)
-    id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"))
-
     nome = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
     cpf = Column(String)
@@ -27,9 +25,9 @@ class User(Base):
     status_cadastro = Column(
         SQLEnum(
             StatusCadastroEnum,
-            name="status_cadastro_enum",  # MESMO nome do enum no Postgres
+            name="status_cadastro_enum",
             native_enum=True,
-            create_type=False              # importante, pq o enum já existe
+            create_type=False
         ),
         nullable=False
     )
@@ -55,29 +53,12 @@ class Unidade(Base):
     id_campus = Column(Integer, ForeignKey("campus.id_campus"), nullable=False)
     nome_unidade = Column(String, nullable=False)
 
-class UserAluno(Base):
-    __tablename__ = "usuario_aluno"
+class Periodo(Base):
+    __tablename__ = "periodo"
 
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_aluno_graduacao = Column(Integer, ForeignKey("aluno.id_aluno_graduacao"), primary_key=True)
+    id_periodo = Column(Integer, primary_key=True, nullable=False)
+    periodo = Column(String, nullable=False)
 
-class UserProfessor(Base):
-    __tablename__ = "usuario_professor"
-
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_curso = Column(Integer, ForeignKey("curso.id_curso"), primary_key=True)
-
-class UserCoordenador(Base):
-    __tablename__ = "usuario_coordenador"
-
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_curso = Column(Integer, ForeignKey("curso.id_curso"), primary_key=True)
-
-class UserDepartamento(Base):
-    __tablename__ = "usuario_departamento"
-
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
-    id_departamento = Column(Integer, ForeignKey("departamento.id_departamento"), primary_key=True)
 
 class Curso(Base):
     __tablename__ = "curso"
@@ -88,11 +69,6 @@ class Curso(Base):
     nome_curso = Column(String, nullable=False)
     modalidade = Column(String)
 
-class Periodo(Base):
-    __tablename__ = "periodo"
-
-    id_periodo = Column(Integer, primary_key=True, nullable=False)
-    periodo = Column(String, nullable=False)
 
 class Departamento(Base):
     __tablename__ = "departamento"
@@ -101,9 +77,24 @@ class Departamento(Base):
     id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
     nome_departamento = Column(String, nullable=False)
 
+
+class Disciplina(Base):
+    __tablename__ = "disciplina"
+
+    id_disciplina = Column(Integer, primary_key=True, index=True)
+    id_curso = Column(Integer, ForeignKey("curso.id_curso"), nullable=False)
+    nome_disciplina = Column(String, nullable=False)
+
+
+class TipoProreitoria(Base):
+    __tablename__ = "tipo_proreitoria"
+
+    id_tipo_proreitoria = Column(Integer, primary_key=True, index=True)
+    nome_proreitoria = Column(String, nullable=False)
+
+
 class DocumentoUsuario(Base):
     __tablename__ = "documento_usuario"
-
 
     id_documento = Column(Integer, primary_key=True, index=True)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
@@ -122,4 +113,46 @@ class DocumentoUsuario(Base):
             native_enum=True,
             create_type=False
         ),
-        nullable=False)
+        nullable=False
+    )
+
+class UserReitor(Base):
+    __tablename__ = "usuario_reitor"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_campus = Column(Integer, ForeignKey("campus.id_campus"), primary_key=True)
+
+class UserProrei(Base):
+    __tablename__ = "usuario_prorei"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_proreitoria = Column(Integer, ForeignKey("tipo_proreitoria.id_tipo_proreitoria"), primary_key=True)
+    id_campus = Column(Integer, ForeignKey("campus.id_campus"), nullable=False)
+
+class UserAluno(Base):
+    __tablename__ = "usuario_aluno"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_aluno_graduacao = Column(Integer, ForeignKey("aluno.id_aluno_graduacao"), primary_key=True)
+    id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
+
+class UserProfessor(Base):
+    __tablename__ = "usuario_professor"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_disciplina = Column(Integer, ForeignKey("disciplina.id_disciplina"), primary_key=True)
+    id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
+
+class UserCoordenador(Base):
+    __tablename__ = "usuario_coordenador"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_curso = Column(Integer, ForeignKey("curso.id_curso"), primary_key=True)
+    id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
+
+class UserDepartamento(Base):
+    __tablename__ = "usuario_departamento"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_departamento = Column(Integer, ForeignKey("departamento.id_departamento"), primary_key=True)
+    id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
