@@ -4,7 +4,7 @@ from app.database import get_db
 from app.schemas.user_schema import UserCreateForm, UserCreateResponse, CategoriaEnum
 from app.controllers.user_controller import UserController
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/users", tags=["Usuários"])
 
 user_controller = UserController()
 
