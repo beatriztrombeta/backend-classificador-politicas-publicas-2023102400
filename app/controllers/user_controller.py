@@ -26,24 +26,15 @@ class UserController:
         Returns:
             UserCreateResponse com dados do usuário criado
         """
-        try:
-            # Converte os dados do formulário para o schema apropriado
-            data = {k: v for k, v in vars(form).items() if v is not None}
-            user_data = TypeAdapter(UserCreate).validate_python(data)
-            
-            # Delega a criação para o service
-            result = await self.service.create_user(
-                db=db,
-                user_data=user_data,
-                file=file
-            )
-            
-            # Commit da transação
-            db.commit()
-            
-            return result
-            
-        except Exception:
-            # Rollback em caso de erro
-            db.rollback()
-            raise
+        # Converte os dados do formulário para o schema apropriado
+        data = {k: v for k, v in vars(form).items() if v is not None}
+        user_data = TypeAdapter(UserCreate).validate_python(data)
+        
+        # Delega a criação para o service
+        result = await self.service.create_user(
+            db=db,
+            user_data=user_data,
+            file=file
+        )
+        
+        return result

@@ -1,25 +1,25 @@
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import List, Union, Annotated, Optional
 from typing_extensions import Literal
-from enum import IntEnum
+from enum import Enum
 import re
 from pathlib import Path
 from fastapi import Form
 
-class CategoriaEnum(IntEnum):
-    ALUNO = 1
-    PROFESSOR = 2
-    COORDENACAO = 3
-    DEPARTAMENTO = 4
-    PRO_REITORIA = 5
-    REITORIA = 6
+class CategoriaEnum(str, Enum):
+    ALUNO = "ALUNO"
+    PROFESSOR = "PROFESSOR"
+    COORDENACAO = "COORDENAÇÃO"
+    DEPARTAMENTO = "DEPARTAMENTO"
+    PRO_REITORIA = "PRO-REITORIA"
+    REITORIA = "REITORIA"
+    ADMIN = "ADMIN"
 
 class UserBase(BaseModel):
     nome: str = Field(..., description="Name of the user")
     email: EmailStr = Field(..., description="Institutional email of the user")
     cpf: str = Field(..., description="CPF of the user")
     telefone: str = Field(..., description="Phone number of the user, with only de DDD and number, with the format (xx) xxxxx-xxxx or (xx) xxxx-xxxx")
-    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
 
     @field_validator("email")
     @classmethod
@@ -63,29 +63,38 @@ class UserBase(BaseModel):
         return value
         
 
-class UserReitor(UserBase):
-    categoria: Literal[CategoriaEnum.REITORIA]
+class UserAdmin(UserBase):
+    categoria: Literal[CategoriaEnum.ADMIN]
     pass
 
-class UserProReitor(UserBase):
+class UserReitor(UserBase):
+    categoria: Literal[CategoriaEnum.REITORIA]
+    campus_id: int = Field(..., description="Unique identifier for a 'campus' already registered on the system")
+    pass
+
+class UserProReitor(UserReitor):
     categoria: Literal[CategoriaEnum.PRO_REITORIA]
-    area_id: int = Field(..., description="lorem ipsum")
+    proreitoria_id: int = Field(..., description="Unique identifier for a 'tipo_proreitoria' already registered on the system")
 
 class UserDepartamento(UserBase):
     categoria: Literal[CategoriaEnum.DEPARTAMENTO]
+    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
     departamento_id: int = Field(..., description="Unique identifier for a 'departamento' already registered on the system")
 
 class UserCoordenacao(UserBase):
     categoria: Literal[CategoriaEnum.COORDENACAO]
+    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
     curso_id: int = Field(..., description="Unique identifier for a 'curso' already registered on the system")
 
 class UserProfessor(UserCoordenacao):
     categoria: Literal[CategoriaEnum.PROFESSOR]
+    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
     disciplinas: List[int] = Field(..., description="List of 'disciplinas' ids")
 
 class UserAluno(UserBase):
     categoria: Literal[CategoriaEnum.ALUNO]
-    ra: str = Field(..., min_length=9, max_length=9, description="RA of the user")
+    unidade_id: int = Field(..., description="Unique identifier for a 'unidade' already registered on the system")
+    ra: str = Field(..., description="RA of the user")
 
     @field_validator("ra")
     @classmethod
@@ -101,7 +110,8 @@ UserCreate = Annotated[
         UserCoordenacao,
         UserDepartamento,
         UserReitor,
-        UserProReitor
+        UserProReitor,
+        UserAdmin
     ],
     Field(discriminator="categoria")
 ]
@@ -113,25 +123,27 @@ class UserCreateForm:
         email: EmailStr,
         cpf: str,
         telefone: str,
-        unidade_id: int,
         categoria: CategoriaEnum,
         ra: Optional[str] = None,
-        area_id: Optional[int] = None,
         departamento_id: Optional[int] = None,
         curso_id: Optional[int] = None,
         disciplinas: Optional[List[int]] = None,
+        unidade_id: Optional[int] = None,
+        campus_id: Optional[int] = None,
+        proreitoria_id: Optional[int] = None
     ):
         self.nome = nome
         self.email = email
         self.cpf = cpf
         self.telefone = telefone
-        self.unidade_id = unidade_id
         self.categoria = categoria
         self.ra = ra
-        self.area_id = area_id
         self.departamento_id = departamento_id
         self.curso_id = curso_id
         self.disciplinas = disciplinas
+        self.unidade_id = unidade_id
+        self.campus_id = campus_id
+        self.proreitoria_id = proreitoria_id
 
     @classmethod
     def as_form(
@@ -140,27 +152,29 @@ class UserCreateForm:
         email: EmailStr = Form(...),
         cpf: str = Form(...),
         telefone: str = Form(...),
-        unidade_id: int = Form(...),
         categoria: CategoriaEnum = Form(...),
 
         ra: Optional[str] = Form(None),
-        area_id: Optional[int] = Form(None),
         departamento_id: Optional[int] = Form(None),
         curso_id: Optional[int] = Form(None),
-        disciplinas: Optional[List[int]] = Form(None),
+        disciplinas: List[int] = Form([]),
+        unidade_id: Optional[int] = Form(None),
+        campus_id: Optional[int] = Form(None),
+        proreitoria_id: Optional[int] = Form(None)
     ):
         return cls(
-            nome,
-            email,
-            cpf,
-            telefone,
-            unidade_id,
-            categoria,
-            ra,
-            area_id,
-            departamento_id,
-            curso_id,
-            disciplinas,
+            nome=nome,
+            email=email,
+            cpf=cpf,
+            telefone=telefone,
+            categoria=categoria,
+            ra=ra,
+            departamento_id=departamento_id,
+            curso_id=curso_id,
+            disciplinas=disciplinas,
+            unidade_id=unidade_id,
+            campus_id=campus_id,
+            proreitoria_id=proreitoria_id
         )
 
 class UserCreateResponse(BaseModel):
@@ -173,3 +187,33 @@ class SavedFile(BaseModel):
     size: int
     mime_type: str
     base_path: Path
+
+class UserCreationError(Exception):
+    pass
+
+class DisciplinaNotFoundError(UserCreationError):
+    pass
+
+class DuplicatedDisciplinaError(UserCreationError):
+    pass
+
+class CursoNotFoundError(UserCreationError):
+    pass
+
+class DepartamentoNotFoundError(UserCreationError):
+    pass
+
+class CategoriaNotFoundError(UserCreationError):
+    pass
+
+class CampusNotFoundError(UserCreationError):
+    pass
+
+class TipoProreitoriaNotFoundError(UserCreationError):
+    pass
+
+class UnidadeNotFoundError(UserCreationError):
+    pass
+
+class AlunoNotFoundError(UserCreationError):
+    pass

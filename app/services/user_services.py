@@ -4,7 +4,9 @@ from typing import Union
 from app.schemas.user_schema import (
     UserCreate, UserAluno, UserProfessor, UserCoordenacao,
     UserDepartamento, UserProReitor, UserReitor, CategoriaEnum,
-    UserCreateResponse, SavedFile
+    UserCreateResponse, SavedFile, DuplicatedDisciplinaError, DisciplinaNotFoundError,
+    CursoNotFoundError, DepartamentoNotFoundError, CategoriaNotFoundError,
+    UnidadeNotFoundError, CampusNotFoundError, AlunoNotFoundError
 )
 from app.repositories.user_repository import UserRepository
 from app.models.user_model import StatusCadastroEnum
@@ -55,40 +57,86 @@ class UserService:
                 detail="A user with this email address already exists."
             )
         
-        # Busca a unidade
-        unidade = self.repository.get_unidade_by_id(db, user_data.unidade_id)
-        if not unidade:
-            raise HTTPException(
-                status_code=404,
-                detail="Unidade not found"
+        try:
+            # Cria o usuário base
+            base_user = self.repository.create_base_user(
+                db=db,
+                user_data=user_data,
+                categoria=user_data.categoria
+            )
+            
+            # Cria o registro específico do tipo de usuário
+            creator_function = self._get_user_creator_function(user_data.categoria)
+            created_user = creator_function(db, user_data, base_user)
+            
+            # Valida e salva o arquivo
+            await self.file_service.validate_file(file)
+            saved_file = await self.file_service.save_file(file)
+            
+            # Cria o registro do documento
+            self.repository.create_documento_usuario(
+                db=db,
+                saved_file=saved_file,
+                usuario_id=created_user.id_usuario
+            )
+
+            db.commit()
+            
+            # Prepara a resposta
+            return UserCreateResponse(
+                id=created_user.id_usuario,
+                email=user_data.email,
+                status=StatusCadastroEnum.PENDENTE
             )
         
-        # Cria o usuário base
-        base_user = self.repository.create_base_user(
-            db=db,
-            user_data=user_data,
-            categoria=user_data.categoria,
-            unidade=unidade
-        )
+        except DisciplinaNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Disciplina informada não existe"
+            )
         
-        # Cria o registro específico do tipo de usuário
-        creator_function = self._get_user_creator_function(user_data.categoria)
-        created_user = creator_function(db, user_data, base_user)
+        except DuplicatedDisciplinaError:
+            raise HTTPException(
+                status_code=409,
+                detail="Foram informadas disciplinas duplicadas"
+            )
         
-        # Valida e salva o arquivo
-        await self.file_service.validate_file(file)
-        saved_file = await self.file_service.save_file(file)
+        except CursoNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Curso informado não existe"
+            )
+
+        except DepartamentoNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Departamento informado não existe"
+            )
+
+        except CategoriaNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Categoria informada não existe"
+            )
+
+        except UnidadeNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Unidade informada não existe"
+            )
         
-        # Cria o registro do documento
-        self.repository.create_documento_usuario(
-            db=db,
-            saved_file=saved_file,
-            usuario_id=created_user.id_usuario
-        )
+        except CampusNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Campus informado não existe"
+            )
         
-        # Prepara a resposta
-        return UserCreateResponse(
-            id=created_user.id_usuario,
-            email=user_data.email,
-            status=StatusCadastroEnum.PENDENTE
-        )
+        except AlunoNotFoundError:
+            raise HTTPException(
+                status_code=400,
+                detail="Aluno informado não existe"
+            )
+
+        except Exception:
+            db.rollback()
+            raise
