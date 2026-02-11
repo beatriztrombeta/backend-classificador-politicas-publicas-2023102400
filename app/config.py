@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     ALLOWED_EMAIL_DOMAINS: str
     FILES_PATH: str
     FRONTEND_URL: str
+    BACKEND_URL: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

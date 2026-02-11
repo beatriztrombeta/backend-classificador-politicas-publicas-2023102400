@@ -1,11 +1,18 @@
+from typing import List, Tuple
+
 def admin_document_review_email(
     admin_name: str,
     user_name: str,
     user_email: str,
     approve_link: str,
-    reject_link: str
+    reject_link: str,
+    documents: List[Tuple[str, str]],
 ) -> tuple[str, str]:
     subject = "Cadastro pendente para análise"
+
+    docs_block = "Nenhum documento encontrado.\n"
+    if documents:
+        docs_block = "\n".join([f"- {label}: {url}" for (label, url) in documents])
 
     body = f"""
 Olá, {admin_name},
@@ -15,6 +22,9 @@ Um novo usuário possui cadastro pendente de análise documental.
 Dados do usuário:
 Nome: {user_name}
 E-mail: {user_email}
+
+Documentos para análise:
+{docs_block}
 
 Ações disponíveis:
 
@@ -27,44 +37,8 @@ Rejeitar cadastro:
 Observações:
 - Os links são pessoais e intransferíveis.
 - O token expira automaticamente.
-- Após a ação, o link se torna inválido.
-
-Atenciosamente,
-Sistema de Cadastro Institucional
-""".strip()
-
-    return subject, body
-
-def admin_document_review_email(
-    admin_name: str,
-    user_name: str,
-    user_email: str,
-    approve_link: str,
-    reject_link: str
-) -> tuple[str, str]:
-    subject = "Cadastro pendente para análise"
-
-    body = f"""
-Olá, {admin_name},
-
-Um novo usuário possui cadastro pendente de análise documental.
-
-Dados do usuário:
-Nome: {user_name}
-E-mail: {user_email}
-
-Ações disponíveis:
-
-Aprovar cadastro:
-{approve_link}
-
-Rejeitar cadastro:
-{reject_link}
-
-Observações:
-- Os links são pessoais e intransferíveis.
-- O token expira automaticamente.
-- Após a ação, o link se torna inválido.
+- Após aprovar/rejeitar, você deve tratar o link como inválido (uso único, se você configurar assim).
+- Links de documentos expiram automaticamente (curta duração).
 
 Atenciosamente,
 Sistema de Cadastro Institucional
