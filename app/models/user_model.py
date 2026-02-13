@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP
+from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, DECIMAL
 from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.sql import func
 from app.models.base import Base
 from enum import Enum
 
@@ -105,7 +106,10 @@ class DocumentoUsuario(Base):
     hash_arquivo = Column(String, nullable=False)
     mime_type = Column(String)
     tamanho_arquivo = Column(Integer)
-    data_envio = Column(TIMESTAMP)
+    data_envio = Column(
+        TIMESTAMP(timezone=True),
+        server_default=func.now(),
+    )
     status_analise = Column(
         SQLEnum(
             StatusAnaliseEnum,
@@ -156,3 +160,37 @@ class UserDepartamento(Base):
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
     id_departamento = Column(Integer, ForeignKey("departamento.id_departamento"), primary_key=True)
     id_unidade = Column(Integer, ForeignKey("unidade.id_unidade"), nullable=False)
+
+class Aluno(Base):
+    __tablename__ = "aluno"
+    
+    id_aluno_graduacao = Column(Integer, primary_key=True)
+    id_curso = Column(String, ForeignKey("curso.id_curso"), nullable=False)
+    raca_cor = Column(String)
+    sexo = Column(String)
+    ano_nascimento = Column(Integer)
+    ensino_medio = Column(String)
+    cidade_origem = Column(String)
+    estado_origem = Column(String)
+    pais_origem = Column(String)
+    cotas = Column(String)
+    tipo_ingresso = Column(String)
+    forma_ingresso = Column(String)
+    ano_matricula = Column(Integer)
+    situacao = Column(String)
+    motivo_desvinculo = Column(String)
+    data_desvinculo = Column(TIMESTAMP)
+    cr = Column(DECIMAL)
+    max_nota = Column(DECIMAL)
+    min_nota = Column(DECIMAL)
+    avg_nota = Column(DECIMAL)
+    median_nota = Column(DECIMAL)
+    unique_disciplinas = Column(Integer)
+    max_frequencia = Column(DECIMAL)
+    min_frequencia = Column(DECIMAL)
+    avg_frequencia = Column(DECIMAL)
+    median_frequencia = Column(DECIMAL)
+    idade_matricula = Column(Integer)
+    perc_reprovacao = Column(DECIMAL)
+    perc_exames = Column(DECIMAL)
+    distancia_campus = Column(DECIMAL)

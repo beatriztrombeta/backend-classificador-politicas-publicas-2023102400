@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.user_schema import UserCreateForm, UserCreateResponse, CategoriaEnum
+from app.schemas.user_schema import UserCreateForm, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
 from app.controllers.user_controller import UserController
+from typing import List
 
 router = APIRouter(prefix="/users", tags=["Usuários"])
 
@@ -30,3 +31,19 @@ async def create_new_user(
         file=file,
         db=db
     )
+
+@router.get("/pendings", response_model=List[UserResponse])
+async def list_pending_users(db: Session = Depends(get_db)):
+    return await user_controller.list_pending_users(db)
+
+@router.get("/documents", response_model=List[DocumentResponse])
+async def list_documents(db: Session = Depends(get_db)):
+    return await user_controller.list_documents(db)
+
+@router.get("/documents/download/{document_id}")
+def download_document(document_id: int, db: Session = Depends(get_db)):
+    return user_controller.download_document(document_id, db)
+
+@router.patch("/status/{id}")
+def approval_reject_registration(body: UpdateStatusCadastro, id: int, db: Session = Depends(get_db)):
+    return user_controller.approval_reject_registration(body, id, db)
