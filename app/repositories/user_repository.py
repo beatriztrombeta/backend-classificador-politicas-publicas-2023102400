@@ -15,6 +15,7 @@ from app.schemas.user_schema import (
     UserDepartamento as UserDepartamentoSchema,
     UserProReitor as UserProReitorSchema,
     UserReitor as UserReitorSchema,
+    UserAdmin as UserAdminSchema,
     CategoriaEnum, SavedFile,
     DisciplinaNotFoundError,
     DuplicatedDisciplinaError,
@@ -292,6 +293,10 @@ class UserRepository:
         
         return document
     
+    @staticmethod
+    def create_usuario_admin(db: Session, user_data: UserAdminSchema, base_user: User) -> User:
+        return base_user
+
     @staticmethod
     def list_pending_users(db: Session) -> List[User]:
         """Lista todos os usuários que estão com o cadastro pendente"""

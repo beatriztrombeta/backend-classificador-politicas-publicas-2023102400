@@ -27,7 +27,8 @@ class UserService:
             CategoriaEnum.COORDENACAO: self.repository.create_usuario_coordenador,
             CategoriaEnum.DEPARTAMENTO: self.repository.create_usuario_departamento,
             CategoriaEnum.PRO_REITORIA: self.repository.create_usuario_pro_reitor,
-            CategoriaEnum.REITORIA: self.repository.create_usuario_reitor
+            CategoriaEnum.REITORIA: self.repository.create_usuario_reitor,
+            CategoriaEnum.ADMIN: self.repository.create_usuario_admin
         }
         return user_creators.get(categoria)
     
