@@ -6,7 +6,7 @@ from app.services.permission_service import PermissionService
 from app.schemas.permission_schema import Resource, Action, AccessScope
 from app.utils.auth import get_current_user
 
-from app.models.user_model import User  # <- necessário para lookup por email
+from app.models.user_model import User
 
 permission_service = PermissionService()
 
@@ -15,7 +15,6 @@ def _resolve_user_id(db: Session, current_user) -> int:
         return int(current_user.id_usuario)
 
     if isinstance(current_user, dict):
-        # chaves comuns
         for key in ("id_usuario", "user_id", "id", "uid"):
             if key in current_user and current_user[key] is not None:
                 try:

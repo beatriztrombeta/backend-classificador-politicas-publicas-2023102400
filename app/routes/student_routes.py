@@ -3,9 +3,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import get_db
-from app.utils.access_control import require_permission, get_access_scope
-from app.schemas.permission_schema import Resource, Action, AccessScope
+from app.utils.access_control import require_permission
+from app.schemas.permission_schema import Resource, Action, AccessScope, RoleId
 from app.services.permission_service import PermissionService
+from app.services.xai_service import fetch_xai_from_db, generate_groq_summary
+from app.services.persona_service import fetch_high_risk_ids, aggregate_signals, population_stats
+from app.services.persona_service import generate_personas_with_groq, build_persona_inputs
 
 router = APIRouter(prefix="/students", tags=["Alunos"])
 perm = PermissionService()
@@ -109,3 +112,75 @@ def list_students(
     """
     rows = db.execute(text(sql), params).mappings().all()
     return {"items": [dict(r) for r in rows]}
+
+@router.get("/{aluno_id}/xai-summary")
+def get_student_xai_summary(
+    aluno_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.STUDENT, Action.READ)),
+):
+    perm.assert_student_access(db=db, scope=scope, aluno_id=aluno_id)
+
+    payload = fetch_xai_from_db(db=db, aluno_id=aluno_id)
+
+    summary = None
+    err = None
+    try:
+        summary, err = generate_groq_summary(payload)
+    except Exception as e:
+        summary = None
+        err = {"type": "exception", "message": str(e)}
+
+    payload["groq_summary"] = summary
+    payload["groq_error"] = err
+    return {"data": payload}
+
+
+@router.get("/personas/high-risk")
+def get_high_risk_personas(
+    threshold: float = 0.70,
+    top_n: int = 500,
+    personas_n: int = 3,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.STUDENT, Action.READ)),
+):
+    if scope.role_id == RoleId.ALUNO:
+        raise HTTPException(status_code=403, detail="Not allowed for this role")
+
+    ids = fetch_high_risk_ids(db, threshold=threshold, top_n=top_n)
+    pop = population_stats(db, threshold=threshold)
+
+    if not ids:
+        return {
+            "data": {
+                "population": pop,
+                "signals": {"top_risk_drivers": []},
+                "groups": [],
+                "personas": [],
+                "groq_error": None,
+            }
+        }
+
+    inputs = build_persona_inputs(
+        db=db,
+        high_risk_ids=ids,
+        threshold=threshold,
+        personas_n=personas_n,
+    )
+
+    signals = aggregate_signals(db, aluno_ids=ids)
+
+    personas, groq_error = generate_personas_with_groq(
+        payload=inputs,
+        personas_n=personas_n,
+    )
+
+    return {
+        "data": {
+            "population": inputs["population"],
+            "signals": {"top_risk_drivers": signals[:10]},
+            "groups": inputs["groups"],
+            "personas": personas,
+            "groq_error": groq_error,
+        }
+    }

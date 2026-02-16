@@ -48,7 +48,6 @@ class UserRepository:
     @staticmethod
     def get_admin_users(db: Session) -> list[User]:
         """Busca todos os usuários administradores (categoria_usuario = 1)"""
-        # NOTA: Ajuste o valor '1' conforme o ID da categoria admin no seu banco
         return db.query(User).filter(User.id_categoria_usuario == 1).all()
     
     @staticmethod
@@ -218,7 +217,6 @@ class UserRepository:
         
         return user
     
-    # TODO: Aguardar essas duas entidades serem criadas no banco para terminar a funcao
     @staticmethod
     def create_usuario_pro_reitor(db: Session, user_data: UserProReitorSchema, base_user: User):
         """Cria registro específico de pro-reitor"""

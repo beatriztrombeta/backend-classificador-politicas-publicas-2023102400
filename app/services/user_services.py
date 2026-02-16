@@ -52,7 +52,6 @@ class UserService:
         Raises:
             HTTPException: Em caso de erro na validação ou criação
         """
-        # Verifica se o email já existe
         if self.repository.email_exists(db, user_data.email):
             raise HTTPException(
                 status_code=409, 
