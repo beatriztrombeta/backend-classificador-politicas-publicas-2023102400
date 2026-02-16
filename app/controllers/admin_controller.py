@@ -73,7 +73,7 @@ def reject_user(token: str, db: Session):
 
     UserRepository.update_status(db, user.id_usuario, "REJEITADO")
 
-    contact_email = getattr(settings, 'SUPPORT_EMAIL', 'suporte@unesp.br')  # Email de suporte
+    contact_email = getattr(settings, 'SUPPORT_EMAIL', 'suporte.exemplo@unesp.br')
     subject, body = user_rejection_email(
         user_name=user.nome,
         contact_email=contact_email
