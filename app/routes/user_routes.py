@@ -4,6 +4,8 @@ from app.database import get_db
 from app.schemas.user_schema import UserCreateForm, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
 from app.controllers.user_controller import UserController
 from typing import List
+from app.schemas.permission_schema import Resource, Action, AccessScope
+from app.utils.access_control import require_permission
 
 router = APIRouter(prefix="/users", tags=["Usuários"])
 
@@ -45,5 +47,9 @@ def download_document(document_id: int, db: Session = Depends(get_db)):
     return user_controller.download_document(document_id, db)
 
 @router.patch("/status/{id}")
-def approval_reject_registration(body: UpdateStatusCadastro, id: int, db: Session = Depends(get_db)):
+def approval_reject_registration(
+    body: UpdateStatusCadastro,
+    id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE))):
     return user_controller.approval_reject_registration(body, id, db)
