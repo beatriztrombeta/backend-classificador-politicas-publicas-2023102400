@@ -9,7 +9,7 @@ class FileService:
     @staticmethod
     async def validate_file(file: UploadFile) -> None:
         """Valida se o arquivo é um PDF válido e respeita o tamanho máximo"""
-        threshold = 5 * 1024 * 1024  # 5 MB
+        threshold = 5 * 1024 * 1024
         
         if file.content_type != "application/pdf":
             raise HTTPException(status_code=422, detail="Only pdf files are allowed")

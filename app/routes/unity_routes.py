@@ -84,7 +84,6 @@ def courses_by_unidade(
     db: Session = Depends(get_db),
     scope: AccessScope = Depends(require_permission(Resource.REPORTS, Action.READ)),
 ):
-    # Garante que a unidade está no escopo (mesma lógica de listagem)
     where, params = _unidade_scope_where(scope)
     where.append("un.id_unidade = :uid")
     params["uid"] = unidade_id

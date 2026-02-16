@@ -48,14 +48,12 @@ class UserService:
         Raises:
             HTTPException: Em caso de erro na validação ou criação
         """
-        # Verifica se o email já existe
         if self.repository.email_exists(db, user_data.email):
             raise HTTPException(
                 status_code=409, 
                 detail="A user with this email address already exists."
             )
         
-        # Busca a unidade
         unidade = self.repository.get_unidade_by_id(db, user_data.unidade_id)
         if not unidade:
             raise HTTPException(
@@ -63,7 +61,6 @@ class UserService:
                 detail="Unidade not found"
             )
         
-        # Cria o usuário base
         base_user = self.repository.create_base_user(
             db=db,
             user_data=user_data,
@@ -71,22 +68,18 @@ class UserService:
             unidade=unidade
         )
         
-        # Cria o registro específico do tipo de usuário
         creator_function = self._get_user_creator_function(user_data.categoria)
         created_user = creator_function(db, user_data, base_user)
         
-        # Valida e salva o arquivo
         await self.file_service.validate_file(file)
         saved_file = await self.file_service.save_file(file)
         
-        # Cria o registro do documento
         self.repository.create_documento_usuario(
             db=db,
             saved_file=saved_file,
             usuario_id=created_user.id_usuario
         )
         
-        # Prepara a resposta
         return UserCreateResponse(
             id=created_user.id_usuario,
             email=user_data.email,

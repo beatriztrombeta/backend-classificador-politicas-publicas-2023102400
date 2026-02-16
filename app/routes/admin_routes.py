@@ -56,7 +56,6 @@ def list_users(
     return {"items": [dict(r) for r in rows], "limit": limit, "offset": offset}
 
 
-# (Opcional) detalhe do usuário para tela admin
 @router.get("/users/{user_id}")
 def get_user_admin(
     user_id: int,
