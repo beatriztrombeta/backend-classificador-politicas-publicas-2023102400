@@ -37,6 +37,10 @@ def send_login_code(email: str, db: Session):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    
+    status_val = user.status_cadastro.value if hasattr(user.status_cadastro, "value") else str(user.status_cadastro)
+    if status_val != "APROVADO":
+        raise HTTPException(status_code=403, detail="Cadastro ainda não aprovado.")
 
     code = generate_code()
     store_code(email, code)
@@ -49,14 +53,19 @@ def send_login_code(email: str, db: Session):
 
     return {"message": "Código enviado com sucesso."}
 
-def validate_login_code(email: str, code: str):
+def validate_login_code(email: str, code: str, db: Session):
     try:
         email_validation_service.validate(email)
     except (InvalidEmailError, InvalidInstitutionalDomainError):
-        raise HTTPException(
-            status_code=400,
-            detail="E-mail inválido."
-        )
+        raise HTTPException(status_code=400, detail="E-mail inválido.")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+    status_val = user.status_cadastro.value if hasattr(user.status_cadastro, "value") else str(user.status_cadastro)
+    if status_val != "APROVADO":
+        raise HTTPException(status_code=403, detail="Cadastro ainda não aprovado.")
 
     if not verify_code(email, code):
         register_failed_attempt(email)
@@ -65,7 +74,4 @@ def validate_login_code(email: str, code: str):
     reset_attempts(email)
     token = create_jwt_token(email)
 
-    return {
-        "access_token": token,
-        "token_type": "bearer"
-    }
+    return {"access_token": token, "token_type": "bearer"}

@@ -14,8 +14,8 @@ def send_code(data: UserLogin, db: Session = Depends(get_db)):
     return send_login_code(data.email, db)
 
 @router.post("/verify-code")
-def verify_code_endpoint(data: VerifyCode, response: Response):
-    token_data = validate_login_code(data.email, data.code)
+def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Depends(get_db)):
+    token_data = validate_login_code(data.email, data.code, db)
     token = token_data.get("access_token")
 
     if not token:
