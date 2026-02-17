@@ -1,12 +1,15 @@
-from pydantic import BaseModel, Field, EmailStr, field_validator
-from typing import List, Union, Annotated, Optional
-from typing_extensions import Literal
-from enum import Enum
 import re
+from enum import Enum
 from pathlib import Path
 from fastapi import Form
-from app.models.user_model import StatusAnaliseEnum, StatusCadastroEnum
 from datetime import datetime
+from typing_extensions import Literal
+from typing import List, Union, Annotated, Optional
+from pydantic import BaseModel, Field, EmailStr, field_validator
+from app.models.user_model import StatusAnaliseEnum, StatusCadastroEnum
+from app.services.email_validation_service import EmailValidationService, InvalidEmailError, InvalidInstitutionalDomainError
+
+_email_validation_service = EmailValidationService()
 
 class CategoriaEnum(str, Enum):
     ALUNO = "ALUNO"
@@ -26,8 +29,12 @@ class UserBase(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_instituional_email(cls, value: EmailStr):
-        if not value.endswith("@unesp.br"):
-            raise ValueError("Email must be an institutional email")
+        try:
+            _email_validation_service.validate(str(value))
+        except InvalidEmailError as e:
+            raise ValueError(str(e))
+        except InvalidInstitutionalDomainError as e:
+            raise ValueError(str(e))
         return value
 
     @field_validator("cpf")
@@ -67,7 +74,7 @@ class UserBase(BaseModel):
 
 class UserAdmin(UserBase):
     categoria: Literal[CategoriaEnum.ADMIN]
-    pass
+    campus_id: int = Field(..., description="Unique identifier for a 'campus' already registered on the system")
 
 class UserReitor(UserBase):
     categoria: Literal[CategoriaEnum.REITORIA]

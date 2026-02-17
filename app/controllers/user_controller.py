@@ -1,15 +1,21 @@
-from fastapi import Depends, UploadFile, File
+from fastapi import Depends, UploadFile, File, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import TypeAdapter
 from app.schemas.user_schema import UserCreateForm, UserCreate, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
 from app.services.user_services import UserService
 from typing import List
 from datetime import datetime
+from app.services.email_validation_service import (
+    EmailValidationService,
+    InvalidEmailError,
+    InvalidInstitutionalDomainError,
+)
 
 class UserController:
     
     def __init__(self):
         self.service = UserService()
+        self.email_validation_service = EmailValidationService()
     
     async def create_new_user(
         self,
@@ -28,17 +34,22 @@ class UserController:
         Returns:
             UserCreateResponse com dados do usuário criado
         """
-        # Converte os dados do formulário para o schema apropriado
         data = {k: v for k, v in vars(form).items() if v is not None}
         user_data = TypeAdapter(UserCreate).validate_python(data)
-        
-        # Delega a criação para o service
+
+        try:
+            self.email_validation_service.validate(user_data.email)
+        except (InvalidEmailError, InvalidInstitutionalDomainError) as e:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(e),
+            )
+
         result = await self.service.create_user(
             db=db,
             user_data=user_data,
             file=file
         )
-        
         return result
 
     async def list_pending_users(self, db: Session) -> List[UserResponse]:
