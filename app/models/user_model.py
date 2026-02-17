@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, DECIMAL
+from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, DECIMAL, text
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.sql import func
 from app.models.base import Base
@@ -32,8 +32,18 @@ class User(Base):
         ),
         nullable=False
     )
-    data_cadastro = Column(TIMESTAMP)
-    data_atualizacao = Column(TIMESTAMP)
+    data_cadastro = Column(
+    TIMESTAMP(timezone=True),
+    server_default=text("timezone('America/Sao_Paulo', now())"),
+    nullable=False
+)
+
+    data_atualizacao = Column(
+        TIMESTAMP(timezone=True),
+        server_default=text("timezone('America/Sao_Paulo', now())"),
+        onupdate=func.now(),
+        nullable=False
+    )
 
 class UserCategory(Base):
     __tablename__ = "categoria_usuario"
@@ -119,6 +129,12 @@ class DocumentoUsuario(Base):
         ),
         nullable=False
     )
+
+class UserAdmin(Base):
+    __tablename__ = "usuario_admin"
+
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    id_campus = Column(Integer, ForeignKey("campus.id_campus"), nullable=False)
 
 class UserReitor(Base):
     __tablename__ = "usuario_reitor"
