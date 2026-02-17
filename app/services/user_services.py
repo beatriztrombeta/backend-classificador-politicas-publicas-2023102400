@@ -3,8 +3,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from app.schemas.user_schema import (
     UserCreate, UserAluno, UserProfessor, UserCoordenacao,
-    UserDepartamento, UserProReitor, UserReitor, CategoriaEnum,
-    UserCreateResponse, SavedFile, DuplicatedDisciplinaError, DisciplinaNotFoundError,
+    UserDepartamento, UserProReitor, UserReitor, CategoriaEnum, SavedFile, DuplicatedDisciplinaError, DisciplinaNotFoundError,
     CursoNotFoundError, DepartamentoNotFoundError, CategoriaNotFoundError,
     UnidadeNotFoundError, CampusNotFoundError, AlunoNotFoundError,
     UserCreateResponse, UpdateStatusCadastro, UpdateStatusCadastroResponse
@@ -59,22 +58,18 @@ class UserService:
             )
         
         try:
-            # Cria o usuário base
             base_user = self.repository.create_base_user(
                 db=db,
                 user_data=user_data,
                 categoria=user_data.categoria
             )
             
-            # Cria o registro específico do tipo de usuário
             creator_function = self._get_user_creator_function(user_data.categoria)
             created_user = creator_function(db, user_data, base_user)
             
-            # Valida e salva o arquivo
             await self.file_service.validate_file(file)
             saved_file = await self.file_service.save_file(file)
             
-            # Cria o registro do documento
             self.repository.create_documento_usuario(
                 db=db,
                 saved_file=saved_file,
@@ -83,7 +78,6 @@ class UserService:
 
             db.commit()
             
-            # Prepara a resposta
             return UserCreateResponse(
                 id=created_user.id_usuario,
                 email=user_data.email,
