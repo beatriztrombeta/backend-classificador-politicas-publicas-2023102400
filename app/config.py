@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     EMAIL_FROM: str
     DEBUG_EMAILS: bool = False
     GROQ_API_KEY: str
+    ALLOWED_EMAIL_DOMAINS: str
+    FILES_PATH: str
+    FRONTEND_URL: str
+    BACKEND_URL: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
