@@ -6,7 +6,7 @@ from app.models.user_model import (
     UserCoordenador, UserDepartamento, DocumentoUsuario,
     StatusCadastroEnum, StatusAnaliseEnum, Disciplina, Curso,
     Departamento, UserCategory, UserProrei, UserReitor, TipoProreitoria, Campus,
-    Aluno
+    Aluno, UserAdmin
 )
 from app.schemas.user_schema import (
     UserBase, UserAluno as UserAlunoSchema, 
@@ -103,7 +103,7 @@ class UserRepository:
         
         aluno = (
             db.query(Aluno)
-            .filter(Aluno.id_aluno_graduacao == int(user_data.ra)) # Talvez mudar no futuro
+            .filter(Aluno.id_aluno_graduacao == int(user_data.ra))
             .one_or_none()
         )
         if not aluno:
@@ -112,7 +112,7 @@ class UserRepository:
         user = UserAluno(
             id_usuario=base_user.id_usuario,
             id_unidade=user_data.unidade_id,
-            id_aluno_graduacao=int(user_data.ra) # Talvez mudar no futuro
+            id_aluno_graduacao=int(user_data.ra)
         )
         
         db.add(user)
@@ -293,6 +293,23 @@ class UserRepository:
     
     @staticmethod
     def create_usuario_admin(db: Session, user_data: UserAdminSchema, base_user: User) -> User:
+        """Cria registro específico de admin"""
+        campus = (
+            db.query(Campus)
+            .filter(Campus.id_campus == user_data.campus_id)
+            .one_or_none()
+        )
+        if not campus:
+            raise CampusNotFoundError()
+
+        admin = UserAdmin(
+            id_usuario=base_user.id_usuario,
+            id_campus=user_data.campus_id
+        )
+
+        db.add(admin)
+        db.flush()
+
         return base_user
 
     @staticmethod
