@@ -69,3 +69,12 @@ def register_failed_attempt(email: str):
 def reset_attempts(email: str):
     if email in failed_attempts:
         del failed_attempts[email]
+
+def create_signup_token(email: str, expires_minutes: int = 20):
+    payload = {
+        "sub": email,
+        "type": "signup",
+        "exp": datetime.utcnow() + timedelta(minutes=expires_minutes),
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)

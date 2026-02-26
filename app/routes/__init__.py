@@ -8,6 +8,7 @@ from app.routes.notify_routes import router as notify_router
 from app.routes.student_routes import router as student_router
 from app.routes.unity_routes import router as unity_router
 from app.routes.user_routes import router as user_router
+from app.routes.public_routes import router as public_router
 
 router = APIRouter()
 
@@ -19,3 +20,4 @@ router.include_router(notify_router)
 router.include_router(student_router)
 router.include_router(unity_router)
 router.include_router(user_router)
+router.include_router(public_router)
