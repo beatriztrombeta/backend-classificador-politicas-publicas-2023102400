@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, Response
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.user_schema import UserCreateForm, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
@@ -6,6 +6,7 @@ from app.controllers.user_controller import UserController
 from typing import List
 from app.schemas.permission_schema import Resource, Action, AccessScope
 from app.utils.access_control import require_permission
+from app.schemas.user_signup_schema import UserSignupEmail, UserSignupVerifyCode
 
 router = APIRouter(prefix="/users", tags=["Usuários"])
 
@@ -53,3 +54,11 @@ def approval_reject_registration(
     db: Session = Depends(get_db),
     scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE))):
     return user_controller.approval_reject_registration(body, id, db)
+
+@router.post("/send-code")
+def send_signup_code(data: UserSignupEmail, db: Session = Depends(get_db)):
+    return user_controller.send_signup_code(data.email, db)
+
+@router.post("/verify-code")
+def verify_signup_code(data: UserSignupVerifyCode, response: Response, db: Session = Depends(get_db)):
+    return user_controller.verify_signup_code(data.email, data.code, response, db)
