@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.utils.auth import get_current_user
+from app.models.user_model import User
 from app.controllers.auth_controller import (
     send_login_code,
     validate_login_code
@@ -36,3 +38,16 @@ def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Dep
 def logout(response: Response):
     response.delete_cookie("token")
     return {"message": "Logout realizado com sucesso."}
+
+@router.get("/me")
+def me(current=Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == current["email"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+
+    return {
+        "email": user.email,
+        "id_usuario": getattr(user, "id_usuario", None),
+        "nome": getattr(user, "nome", None),
+        "status_cadastro": str(getattr(user, "status_cadastro", "")),
+    }
