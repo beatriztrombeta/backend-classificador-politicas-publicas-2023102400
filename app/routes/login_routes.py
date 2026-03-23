@@ -32,7 +32,10 @@ def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Dep
         max_age=3600
     )
 
-    return {"message": "Login bem-sucedido."}
+    return {
+        "message": "Login bem-sucedido.",
+        "id_categoria_usuario": token_data.get("id_categoria_usuario"),
+    }
 
 @router.post("/logout")
 def logout(response: Response):
@@ -48,6 +51,7 @@ def me(current=Depends(get_current_user), db: Session = Depends(get_db)):
     return {
         "email": user.email,
         "id_usuario": getattr(user, "id_usuario", None),
+        "id_categoria_usuario": getattr(user, "id_categoria_usuario", None),
         "nome": getattr(user, "nome", None),
         "status_cadastro": str(getattr(user, "status_cadastro", "")),
     }

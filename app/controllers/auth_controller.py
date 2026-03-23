@@ -74,4 +74,11 @@ def validate_login_code(email: str, code: str, db: Session):
     reset_attempts(email)
     token = create_jwt_token(email)
 
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "id_usuario": user.id_usuario,
+        "id_categoria_usuario": user.id_categoria_usuario,
+        "email": user.email,
+        "nome": user.nome
+    }
