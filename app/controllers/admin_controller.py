@@ -12,6 +12,27 @@ from app.repositories.user_repository import UserRepository
 from app.utils.email_service import EmailService
 from app.utils.email_templates import user_approval_email, user_rejection_email
 from app.config import settings
+from app.services.admin_service import AdminService
+
+class AdminController:
+    def __init__(self):
+        self.service = AdminService()
+
+    def list_pending_users(self, db: Session, limit: int):
+        items = self.service.list_pending_users(db=db, limit=limit)
+        return {"items": items}
+    def list_users(self, db: Session, status: str | None, limit: int, offset: int):
+        items = self.service.list_users(
+            db=db,
+            status=status,
+            limit=limit,
+            offset=offset,
+        )
+        return {
+            "items": items,
+            "limit": limit,
+            "offset": offset,
+        }
 
 def approve_user(token: str, db: Session):
     token_service = ApprovalTokenService()
