@@ -95,6 +95,7 @@ class Disciplina(Base):
     id_disciplina = Column(Integer, primary_key=True, index=True)
     id_curso = Column(Integer, ForeignKey("curso.id_curso"), nullable=False)
     nome_disciplina = Column(String, nullable=False)
+    nome_disciplina_normalizado = Column(String, nullable=False, index=True)
 
 
 class TipoProreitoria(Base):
