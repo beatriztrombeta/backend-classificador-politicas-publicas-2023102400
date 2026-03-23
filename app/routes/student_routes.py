@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -49,9 +49,32 @@ def get_student_detail(
 
     row = db.execute(
         text("""
-            SELECT a.*, om.classificacao
+            WITH impactos AS (
+                SELECT
+                    pf.id_aluno_graduacao,
+                    jsonb_object_agg(
+                        UPPER(TRIM(pf.descricao)),
+                        pf.peso
+                    ) AS impact
+                FROM peso_features pf
+                WHERE pf.id_aluno_graduacao = :aid
+                GROUP BY pf.id_aluno_graduacao
+            )
+            SELECT
+                a.*,
+                c.nome_curso,
+                u.nome_unidade,
+                ca.nome_campus,
+                p.periodo AS nome_periodo,
+                ROUND((COALESCE(om.classificacao, 0) * 100)::numeric, 2) AS evasao,
+                COALESCE(i.impact, '{}'::jsonb) AS impact
             FROM aluno a
+            JOIN curso c ON c.id_curso = a.id_curso
+            JOIN unidade u ON u.id_unidade = c.id_unidade
+            JOIN campus ca ON ca.id_campus = u.id_campus
+            LEFT JOIN periodo p ON p.id_periodo = c.id_periodo
             LEFT JOIN output_modelo om ON om.id_aluno_graduacao = a.id_aluno_graduacao
+            LEFT JOIN impactos i ON i.id_aluno_graduacao = a.id_aluno_graduacao
             WHERE a.id_aluno_graduacao = :aid
         """),
         {"aid": aluno_id},
@@ -62,35 +85,35 @@ def get_student_detail(
 
 @router.get("")
 def list_students(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     scope: AccessScope = Depends(require_permission(Resource.STUDENT_LIST, Action.LIST)),
 ):
     if scope.role_id.name == "ALUNO":
-        return {"detail": "Aluno não pode listar outros alunos"}
+        raise HTTPException(status_code=403, detail="Aluno não pode listar outros alunos")
+
+    params = {
+        "limit": limit,
+        "offset": offset,
+    }
+    where = []
 
     if scope.role_id.name == "ADMIN":
-        rows = db.execute(text("SELECT id_aluno_graduacao, id_curso FROM aluno LIMIT 200")).mappings().all()
-        return {"items": [dict(r) for r in rows]}
-
-    if scope.role_id.name == "PROFESSOR":
+        pass
+    elif scope.role_id.name == "PROFESSOR":
         if not scope.disciplina_ids:
-            return {"items": []}
-        rows = db.execute(
-            text("""
-                SELECT DISTINCT a.id_aluno_graduacao, a.id_curso
-                FROM aluno a
-                JOIN aluno_disciplina ad ON ad.id_aluno_graduacao = a.id_aluno_graduacao
-                WHERE ad.id_disciplina = ANY(:dids)
-                LIMIT 200
-            """),
-            {"dids": list(scope.disciplina_ids)},
-        ).mappings().all()
-        return {"items": [dict(r) for r in rows]}
-
-    where = []
-    params = {}
-
-    if scope.curso_ids:
+            return {"items": [], "limit": limit, "offset": offset}
+        where.append("""
+            EXISTS (
+                SELECT 1
+                FROM aluno_disciplina adf
+                WHERE adf.id_aluno_graduacao = a.id_aluno_graduacao
+                  AND adf.id_disciplina = ANY(:dids)
+            )
+        """)
+        params["dids"] = list(scope.disciplina_ids)
+    elif scope.curso_ids:
         where.append("a.id_curso = ANY(:curso_ids)")
         params["curso_ids"] = list(scope.curso_ids)
     elif scope.unidade_ids:
@@ -100,18 +123,79 @@ def list_students(
         where.append("u.id_campus = ANY(:campus_ids)")
         params["campus_ids"] = list(scope.campus_ids)
     else:
-        return {"items": []}
+        return {"items": [], "limit": limit, "offset": offset}
 
     sql = f"""
-        SELECT a.id_aluno_graduacao, a.id_curso
+        WITH impactos AS (
+            SELECT
+                pf.id_aluno_graduacao,
+                jsonb_object_agg(UPPER(TRIM(pf.descricao)), pf.peso) AS impact
+            FROM peso_features pf
+            GROUP BY pf.id_aluno_graduacao
+        )
+        SELECT
+            a.id_aluno_graduacao AS "ID_ALUNO_GRADUACAO",
+            a.cidade_origem AS "CIDADE_ORIGEM",
+            a.raca_cor AS "RACA_COR",
+            a.sexo AS "SEXO",
+            a.ensino_medio AS "ENSINO_MEDIO",
+            a.cotas AS "COTAS",
+            a.tipo_ingresso AS "TIPO_INGRESSO",
+            a.situacao AS "SITUACAO",
+            a.ano_matricula AS "ANO_MATRICULA",
+            a.avg_nota AS "AVG_NOTA",
+            a.max_nota AS "MAX_NOTA",
+            a.min_nota AS "MIN_NOTA",
+            a.median_nota AS "MEDIAN_NOTA",
+            a.avg_frequencia AS "AVG_FREQUENCIA",
+            a.max_frequencia AS "MAX_FREQUENCIA",
+            a.min_frequencia AS "MIN_FREQUENCIA",
+            a.median_frequencia AS "MEDIAN_FREQUENCIA",
+            a.perc_reprovacao AS "PERC_REPROVACAO",
+            a.perc_exames AS "PERC_EXAMES",
+            a.unique_disciplinas AS "QTD_DISCIPLINAS",
+            a.ano_nascimento AS "ANO_NASCIMENTO",
+            NULL::INTEGER AS "MES_NASCIMENTO",
+            a.idade_matricula AS "IDADE_MATRICULA",
+            a.distancia_campus AS "DISTANCIA_CAMPUS",
+            c.id_periodo AS "ID_PERIODO",
+            ROUND((COALESCE(om.classificacao, 0) * 100)::numeric, 2) AS "EVASAO",
+            COALESCE(i.impact, '{{}}'::jsonb) AS impact
         FROM aluno a
-        JOIN curso c ON c.id_curso = a.id_curso
-        JOIN unidade u ON u.id_unidade = c.id_unidade
-        WHERE {" AND ".join(where)}
-        LIMIT 200
+        JOIN curso c
+          ON c.id_curso = a.id_curso
+        JOIN unidade u
+          ON u.id_unidade = c.id_unidade
+        LEFT JOIN output_modelo om
+          ON om.id_aluno_graduacao = a.id_aluno_graduacao
+        LEFT JOIN impactos i
+          ON i.id_aluno_graduacao = a.id_aluno_graduacao
+        {"WHERE " + " AND ".join(where) if where else ""}
+        ORDER BY a.id_aluno_graduacao
+        LIMIT :limit OFFSET :offset
     """
+
+    count_sql = f"""
+    SELECT COUNT(*)
+    FROM (
+        SELECT d.nome_disciplina
+        FROM disciplina d
+        JOIN curso c ON c.id_curso = d.id_curso
+        JOIN unidade u ON u.id_unidade = c.id_unidade
+        {"WHERE " + " AND ".join(where) if where else ""}
+        GROUP BY d.nome_disciplina
+    ) sub
+    """
+
+    total = db.execute(text(count_sql), params).scalar()
+
     rows = db.execute(text(sql), params).mappings().all()
-    return {"items": [dict(r) for r in rows]}
+    return {
+    "items": [dict(r) for r in rows],
+    "limit": limit,
+    "offset": offset,
+    "total": total,
+    }
 
 @router.get("/{aluno_id}/xai-summary")
 def get_student_xai_summary(
@@ -184,3 +268,33 @@ def get_high_risk_personas(
             "groq_error": groq_error,
         }
     }
+
+@router.get("/{aluno_id}/subjects")
+def get_student_subjects(
+    aluno_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.STUDENT, Action.READ)),
+):
+    perm.assert_student_access(db=db, scope=scope, aluno_id=aluno_id)
+
+    rows = db.execute(
+        text("""
+            SELECT
+                ad.id_aluno_graduacao,
+                ad.id_disciplina,
+                d.nome_disciplina,
+                ad.conceito,
+                ad.frequencia,
+                ad.tipo_efetivacao,
+                ad.tipo_nota,
+                ad.nota
+            FROM aluno_disciplina ad
+            JOIN disciplina d
+              ON d.id_disciplina = ad.id_disciplina
+            WHERE ad.id_aluno_graduacao = :aid
+            ORDER BY d.nome_disciplina
+        """),
+        {"aid": aluno_id},
+    ).mappings().all()
+
+    return {"items": [dict(r) for r in rows]}

@@ -8,6 +8,60 @@ from app.schemas.permission_schema import Resource, Action, AccessScope
 
 router = APIRouter(prefix="/cursos", tags=["Cursos"])
 
+def _can_access_course(db: Session, scope: AccessScope, curso_id: int) -> bool:
+    role = scope.role_id.name
+
+    if role == "ADMIN":
+        return True
+
+    if role == "ALUNO":
+        return False
+
+    if role == "COORD":
+        return bool(scope.curso_ids and curso_id in scope.curso_ids)
+
+    if role == "PROFESSOR":
+        if not scope.disciplina_ids:
+            return False
+
+        chk = db.execute(
+            text("""
+                SELECT 1
+                FROM disciplina d
+                WHERE d.id_curso = :cid
+                  AND d.id_disciplina = ANY(:dids)
+                LIMIT 1
+            """),
+            {"cid": curso_id, "dids": list(scope.disciplina_ids)},
+        ).first()
+
+        return bool(chk)
+
+    params = {"cid": curso_id}
+    where = ["c.id_curso = :cid"]
+
+    if scope.unidade_ids:
+        where.append("c.id_unidade = ANY(:uids)")
+        params["uids"] = list(scope.unidade_ids)
+    elif scope.campus_ids:
+        where.append("u.id_campus = ANY(:campus_ids)")
+        params["campus_ids"] = list(scope.campus_ids)
+    else:
+        return False
+
+    chk = db.execute(
+        text(f"""
+            SELECT 1
+            FROM curso c
+            JOIN unidade u ON u.id_unidade = c.id_unidade
+            WHERE {" AND ".join(where)}
+            LIMIT 1
+        """),
+        params,
+    ).first()
+
+    return bool(chk)
+
 @router.get("/{curso_id}/disciplinas")
 def disciplinas_by_curso(
     curso_id: int,
@@ -170,3 +224,71 @@ def list_cursos(
 
     rows = db.execute(text(sql), params).mappings().all()
     return {"items": [dict(r) for r in rows], "limit": limit, "offset": offset}
+
+@router.get("/{curso_id}/alunos")
+def students_by_curso(
+    curso_id: int,
+    limit: int = Query(300, ge=1, le=2000),
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.STUDENT_LIST, Action.LIST)),
+):
+    if not _can_access_course(db, scope, curso_id):
+        return {"items": []}
+
+    rows = db.execute(
+        text("""
+            WITH impactos AS (
+                SELECT
+                    pf.id_aluno_graduacao,
+                    jsonb_object_agg(UPPER(TRIM(pf.descricao)), pf.peso) AS impact
+                FROM peso_features pf
+                WHERE pf.id_aluno_graduacao IN (
+                    SELECT a.id_aluno_graduacao
+                    FROM aluno a
+                    WHERE a.id_curso = :cid
+                )
+                GROUP BY pf.id_aluno_graduacao
+            )
+            SELECT
+                a.id_aluno_graduacao AS "ID_ALUNO_GRADUACAO",
+                a.cidade_origem AS "CIDADE_ORIGEM",
+                a.raca_cor AS "RACA_COR",
+                a.sexo AS "SEXO",
+                a.ensino_medio AS "ENSINO_MEDIO",
+                a.cotas AS "COTAS",
+                a.tipo_ingresso AS "TIPO_INGRESSO",
+                a.situacao AS "SITUACAO",
+                a.ano_matricula AS "ANO_MATRICULA",
+                a.avg_nota AS "AVG_NOTA",
+                a.max_nota AS "MAX_NOTA",
+                a.min_nota AS "MIN_NOTA",
+                a.median_nota AS "MEDIAN_NOTA",
+                a.avg_frequencia AS "AVG_FREQUENCIA",
+                a.max_frequencia AS "MAX_FREQUENCIA",
+                a.min_frequencia AS "MIN_FREQUENCIA",
+                a.median_frequencia AS "MEDIAN_FREQUENCIA",
+                a.perc_reprovacao AS "PERC_REPROVACAO",
+                a.perc_exames AS "PERC_EXAMES",
+                a.unique_disciplinas AS "QTD_DISCIPLINAS",
+                a.ano_nascimento AS "ANO_NASCIMENTO",
+                NULL::INTEGER AS "MES_NASCIMENTO",
+                a.idade_matricula AS "IDADE_MATRICULA",
+                NULL::NUMERIC AS "DISTANCIA_CAMPUS",
+                c.id_periodo AS "ID_PERIODO",
+                ROUND((COALESCE(om.classificacao, 0) * 100)::numeric, 2) AS "EVASAO",
+                COALESCE(i.impact, '{}'::jsonb) AS impact
+            FROM aluno a
+            JOIN curso c
+              ON c.id_curso = a.id_curso
+            LEFT JOIN output_modelo om
+              ON om.id_aluno_graduacao = a.id_aluno_graduacao
+            LEFT JOIN impactos i
+              ON i.id_aluno_graduacao = a.id_aluno_graduacao
+            WHERE a.id_curso = :cid
+            ORDER BY a.id_aluno_graduacao
+            LIMIT :limit
+        """),
+        {"cid": curso_id, "limit": limit},
+    ).mappings().all()
+
+    return {"items": [dict(r) for r in rows]}
