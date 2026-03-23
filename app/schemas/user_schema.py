@@ -252,3 +252,6 @@ class UnidadeNotFoundError(UserCreationError):
 
 class AlunoNotFoundError(UserCreationError):
     pass
+
+class EmptyDisciplinaListError(UserCreationError):
+    pass

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 from typing import Optional, List
 from app.models.user_model import (
     User, Unidade, UserAluno, UserProfessor, 
@@ -25,7 +25,8 @@ from app.schemas.user_schema import (
     CampusNotFoundError,
     TipoProreitoriaNotFoundError,
     UnidadeNotFoundError,
-    AlunoNotFoundError
+    AlunoNotFoundError,
+    EmptyDisciplinaListError
 )
 
 class UserRepository:
@@ -123,6 +124,10 @@ class UserRepository:
     @staticmethod
     def create_usuario_professor(db: Session, user_data: UserProfessorSchema, base_user: User) -> UserProfessor:
         """Cria registros de professor"""
+
+        if not user_data.disciplinas:
+            raise EmptyDisciplinaListError()
+
         existing_disciplinas = (
             db.query(Disciplina)
             .filter(Disciplina.id_disciplina.in_(user_data.disciplinas))
@@ -133,7 +138,7 @@ class UserRepository:
         invalid_ids = set(user_data.disciplinas) - existing_ids
         if invalid_ids:
             raise DisciplinaNotFoundError()
-        
+
         if len(set(user_data.disciplinas)) != len(user_data.disciplinas):
             raise DuplicatedDisciplinaError()
 
@@ -145,14 +150,18 @@ class UserRepository:
         if not unidade:
             raise UnidadeNotFoundError()
 
-        users = [UserProfessor(
-            id_usuario=base_user.id_usuario,
-            id_disciplina=disciplina,
-            id_unidade=user_data.unidade_id) for disciplina in user_data.disciplinas]
-        
+        users = [
+            UserProfessor(
+                id_usuario=base_user.id_usuario,
+                id_disciplina=disciplina,
+                id_unidade=user_data.unidade_id
+            )
+            for disciplina in user_data.disciplinas
+        ]
+
         db.add_all(users)
         db.flush()
-        
+
         return users[0]
     
     @staticmethod
@@ -321,3 +330,120 @@ class UserRepository:
     def list_documents(db: Session) -> List[DocumentoUsuario]:
         """Lista todos os documentos cadastrados"""
         return db.query(DocumentoUsuario).all()
+    
+    @staticmethod
+    def _list_users_admin_base(
+        db: Session,
+        status: str | None = None,
+        limit: int = 200,
+        offset: int = 0,
+        order_asc: bool = False,
+    ):
+        order_clause = "ASC" if order_asc else "DESC"
+
+        params = {
+            "limit": limit,
+            "offset": offset,
+            "status": status,
+        }
+
+        query = text(f"""
+            WITH categoria AS (
+                SELECT
+                    cu.id_categoria_usuario,
+                    TRIM(cu.nome_categoria) AS nome_categoria
+                FROM categoria_usuario cu
+            ),
+            campus_direto AS (
+                SELECT ua.id_usuario, ua.id_campus
+                FROM usuario_admin ua
+                UNION ALL
+                SELECT ur.id_usuario, ur.id_campus
+                FROM usuario_reitor ur
+                UNION ALL
+                SELECT up.id_usuario, up.id_campus
+                FROM usuario_prorei up
+            ),
+            unidade_por_usuario AS (
+                SELECT x.id_usuario, MAX(x.id_unidade) AS id_unidade
+                FROM (
+                    SELECT ua.id_usuario, ua.id_unidade FROM usuario_aluno ua
+                    UNION ALL
+                    SELECT up.id_usuario, up.id_unidade FROM usuario_professor up
+                    UNION ALL
+                    SELECT uc.id_usuario, uc.id_unidade FROM usuario_coordenador uc
+                    UNION ALL
+                    SELECT ud.id_usuario, ud.id_unidade FROM usuario_departamento ud
+                ) x
+                GROUP BY x.id_usuario
+            ),
+            documentos_por_usuario AS (
+                SELECT
+                    du.id_usuario,
+                    json_agg(
+                        json_build_object(
+                            'id_documento', du.id_documento,
+                            'tipo_documento', du.tipo_documento,
+                            'nome_arquivo', split_part(du.storage_key, '/', array_length(string_to_array(du.storage_key, '/'), 1)),
+                            'mime_type', du.mime_type,
+                            'tamanho_arquivo', du.tamanho_arquivo,
+                            'data_envio', du.data_envio,
+                            'status_analise', du.status_analise,
+                            'download_url', CONCAT('/users/documents/download/', du.id_documento)
+                        )
+                        ORDER BY du.data_envio DESC
+                    ) AS documentos
+                FROM documento_usuario du
+                GROUP BY du.id_usuario
+            )
+            SELECT
+                u.id_usuario AS id,
+                u.nome,
+                c.nome_categoria AS categoria,
+                COALESCE(camp_direto.nome_campus, camp_unidade.nome_campus) AS campus,
+                u.data_cadastro,
+                u.data_atualizacao,
+                COALESCE(dpu.documentos, '[]'::json) AS documentos,
+                u.status_cadastro AS status
+            FROM usuario u
+            INNER JOIN categoria c
+                ON c.id_categoria_usuario = u.id_categoria_usuario
+            LEFT JOIN campus_direto cd
+                ON cd.id_usuario = u.id_usuario
+            LEFT JOIN campus camp_direto
+                ON camp_direto.id_campus = cd.id_campus
+            LEFT JOIN unidade_por_usuario uu
+                ON uu.id_usuario = u.id_usuario
+            LEFT JOIN unidade un
+                ON un.id_unidade = uu.id_unidade
+            LEFT JOIN campus camp_unidade
+                ON camp_unidade.id_campus = un.id_campus
+            LEFT JOIN documentos_por_usuario dpu
+                ON dpu.id_usuario = u.id_usuario
+            WHERE (:status IS NULL OR u.status_cadastro = CAST(:status AS status_cadastro_enum))
+            ORDER BY u.data_cadastro {order_clause}
+            LIMIT :limit OFFSET :offset
+        """)
+
+        rows = db.execute(query, params).mappings().all()
+        return [dict(row) for row in rows]
+    
+    @staticmethod
+    def list_pending_users_admin(db: Session, limit: int):
+        return UserRepository._list_users_admin_base(
+            db=db,
+            status="PENDENTE",
+            limit=limit,
+            offset=0,
+            order_asc=True,
+        )
+
+    @staticmethod
+    def list_users_admin(db: Session, status: str | None, limit: int, offset: int):
+        return UserRepository._list_users_admin_base(
+            db=db,
+            status=status,
+            limit=limit,
+            offset=offset,
+            order_asc=False,
+        )

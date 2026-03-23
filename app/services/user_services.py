@@ -6,7 +6,7 @@ from app.schemas.user_schema import (
     UserDepartamento, UserProReitor, UserReitor, CategoriaEnum, SavedFile, DuplicatedDisciplinaError, DisciplinaNotFoundError,
     CursoNotFoundError, DepartamentoNotFoundError, CategoriaNotFoundError,
     UnidadeNotFoundError, CampusNotFoundError, AlunoNotFoundError,
-    UserCreateResponse, UpdateStatusCadastro, UpdateStatusCadastroResponse
+    UserCreateResponse, UpdateStatusCadastro, UpdateStatusCadastroResponse,EmptyDisciplinaListError
 )
 from app.repositories.user_repository import UserRepository
 from app.models.user_model import StatusCadastroEnum, DocumentoUsuario
@@ -131,6 +131,12 @@ class UserService:
                 status_code=400,
                 detail="Aluno informado não existe"
             )
+        
+        except EmptyDisciplinaListError:
+            raise HTTPException(
+                status_code=400,
+                detail="Professor deve informar ao menos uma disciplina"
+    )
 
         except Exception:
             db.rollback()

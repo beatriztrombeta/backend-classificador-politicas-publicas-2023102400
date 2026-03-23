@@ -41,7 +41,10 @@ def list_unidades(
     params["limit"] = limit
 
     sql = f"""
-        SELECT un.id_unidade, un.nome_unidade, un.id_campus, ca.nome_campus
+        SELECT
+            un.id_unidade,
+            un.nome_unidade AS nome,
+            ca.nome_campus AS campus
         FROM unidade un
         JOIN campus ca ON ca.id_campus = un.id_campus
         {"WHERE " + " AND ".join(where) if where else ""}
@@ -59,10 +62,19 @@ def list_unidades(
 
     cursos = db.execute(
         text("""
-            SELECT id_curso, id_unidade, nome_curso, modalidade, id_periodo
-            FROM curso
-            WHERE id_unidade = ANY(:uids)
-            ORDER BY id_unidade, id_curso
+            SELECT
+                c.id_curso,
+                c.id_unidade,
+                c.nome_curso AS nome,
+                ca.nome_campus AS campus,
+                c.modalidade AS tipo,
+                p.periodo AS periodo
+            FROM curso c
+            JOIN unidade un ON un.id_unidade = c.id_unidade
+            JOIN campus ca ON ca.id_campus = un.id_campus
+            JOIN periodo p ON p.id_periodo = c.id_periodo
+            WHERE c.id_unidade = ANY(:uids)
+            ORDER BY c.id_unidade, c.id_curso
         """),
         {"uids": unidade_ids},
     ).mappings().all()
@@ -103,10 +115,19 @@ def courses_by_unidade(
 
     rows = db.execute(
         text("""
-            SELECT id_curso, id_unidade, nome_curso, modalidade, id_periodo
-            FROM curso
-            WHERE id_unidade = :uid
-            ORDER BY id_curso
+            SELECT
+                c.id_curso,
+                c.id_unidade,
+                c.nome_curso AS nome,
+                ca.nome_campus AS campus,
+                c.modalidade AS tipo,
+                p.periodo AS periodo
+            FROM curso c
+            JOIN unidade un ON un.id_unidade = c.id_unidade
+            JOIN campus ca ON ca.id_campus = un.id_campus
+            JOIN periodo p ON p.id_periodo = c.id_periodo
+            WHERE c.id_unidade = :uid
+            ORDER BY c.id_curso
             LIMIT :limit
         """),
         {"uid": unidade_id, "limit": limit},
