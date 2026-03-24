@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.database import get_db
 from app.utils.access_control import require_permission
 from app.schemas.permission_schema import Resource, Action, AccessScope
-from app.controllers.admin_controller import AdminController
+from app.controllers.admin_controller import (
+    AdminController,
+    approve_user_internal,
+    reject_user_internal,
+    view_user_document_internal,
+    list_user_documents_internal,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -36,7 +43,6 @@ def list_users(
         offset=offset,
     )
 
-
 @router.get("/users/{user_id}")
 def get_user_admin(
     user_id: int,
@@ -54,3 +60,37 @@ def get_user_admin(
         {"uid": user_id},
     ).mappings().first()
     return {"data": dict(row) if row else None}
+
+@router.post("/users/{user_id}/approve")
+def approve_user_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE)),
+):
+    return approve_user_internal(user_id=user_id, db=db)
+
+@router.post("/users/{user_id}/reject")
+def reject_user_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE)),
+):
+    return reject_user_internal(user_id=user_id, db=db)
+
+@router.get("/users/{user_id}/documents")
+def list_user_documents_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE)),
+):
+    return list_user_documents_internal(user_id=user_id, db=db)
+
+
+@router.get("/users/{user_id}/documents/{doc_id}/view")
+def view_user_document_admin(
+    user_id: int,
+    doc_id: int,
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.USER_MGMT, Action.MANAGE)),
+):
+    return view_user_document_internal(user_id=user_id, doc_id=doc_id, db=db)
