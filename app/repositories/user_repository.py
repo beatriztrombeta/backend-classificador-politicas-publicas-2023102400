@@ -282,22 +282,21 @@ class UserRepository:
     
     @staticmethod
     def create_documento_usuario(db: Session, saved_file: SavedFile, usuario_id: int) -> DocumentoUsuario:
-        """Cria registro de documento do usuário"""
         document = DocumentoUsuario(
-            id_usuario=usuario_id, 
+            id_usuario=usuario_id,
             tipo_documento="COMPROVANTE_VINCULO",
             storage_provider="LOCAL",
             storage_bucket="local-documents",
-            storage_key=str(saved_file.base_path / saved_file.filename),
+            storage_key=saved_file.relative_path,
             hash_arquivo="hash_fake_comp_456",
             mime_type=saved_file.mime_type,
             tamanho_arquivo=saved_file.size,
             status_analise=StatusAnaliseEnum.PENDENTE
         )
-        
+
         db.add(document)
         db.flush()
-        
+
         return document
     
     @staticmethod

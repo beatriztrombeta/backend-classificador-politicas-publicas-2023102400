@@ -5,15 +5,14 @@ import uuid
 from app.schemas.user_schema import SavedFile
 
 class FileService:
-    
+
     @staticmethod
     async def validate_file(file: UploadFile) -> None:
-        """Valida se o arquivo é um PDF válido e respeita o tamanho máximo"""
         threshold = 5 * 1024 * 1024
-        
+
         if file.content_type != "application/pdf":
             raise HTTPException(status_code=422, detail="Only pdf files are allowed")
-        
+
         content = await file.read()
 
         if not content:
@@ -26,26 +25,30 @@ class FileService:
 
         if file.size > threshold:
             raise HTTPException(status_code=422, detail="The file exceeds 5 MB.")
-    
+
     @staticmethod
-    async def save_file(file: UploadFile) -> SavedFile:
-        """Salva o arquivo no sistema de arquivos e retorna informações sobre o arquivo salvo"""
-        base_dir = Path(os.getenv("FILES_PATH"))
+    async def save_file(file: UploadFile, subdir: str | None = None) -> SavedFile:
+        base_dir = Path(os.getenv("FILES_PATH", "app/storage/documents")).resolve()
         base_dir.mkdir(parents=True, exist_ok=True)
 
-        ext = Path(file.filename).suffix.lower()
+        ext = Path(file.filename or "").suffix.lower() or ".pdf"
         filename = f"{uuid.uuid4()}{ext}"
 
-        file_path = base_dir / filename
+        relative_dir = Path(subdir) if subdir else Path()
+        target_dir = (base_dir / relative_dir).resolve()
+        target_dir.mkdir(parents=True, exist_ok=True)
 
+        file_path = target_dir / filename
         content = await file.read()
 
         with open(file_path, "wb") as f:
             f.write(content)
 
+        relative_path = str((relative_dir / filename).as_posix())
+
         return SavedFile(
             filename=filename,
+            relative_path=relative_path,
             size=len(content),
             mime_type=file.content_type,
-            base_path=base_dir
         )

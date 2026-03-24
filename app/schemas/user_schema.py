@@ -193,9 +193,9 @@ class UserCreateResponse(BaseModel):
 
 class SavedFile(BaseModel):
     filename: str
+    relative_path: str
     size: int
     mime_type: str
-    base_path: Path
 
 class UserResponse(BaseModel):
     id: int = Field(..., description="Unique identifier for user")

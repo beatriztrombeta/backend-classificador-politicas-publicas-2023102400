@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from pathlib import Path
+from app.config import settings
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from app.schemas.user_schema import (
@@ -68,8 +70,11 @@ class UserService:
             created_user = creator_function(db, user_data, base_user)
             
             await self.file_service.validate_file(file)
-            saved_file = await self.file_service.save_file(file)
-            
+            saved_file = await self.file_service.save_file(
+                file=file,
+                subdir=f"users/{base_user.id_usuario}"
+            )
+
             self.repository.create_documento_usuario(
                 db=db,
                 saved_file=saved_file,
@@ -158,11 +163,24 @@ class UserService:
         if not document:
             raise HTTPException(status_code=404, detail="Documento não encontrado")
 
+        raw_path = Path(document.storage_key)
+        if raw_path.is_absolute():
+            raise HTTPException(status_code=500, detail="storage_key absoluto não é permitido")
+
+        base_dir = Path(getattr(settings, "DOCUMENTS_BASE_DIR", "app/storage/documents")).resolve()
+        file_path = (base_dir / raw_path).resolve()
+
+        if base_dir not in file_path.parents and file_path != base_dir:
+            raise HTTPException(status_code=403, detail="Acesso ao arquivo negado")
+
+        if not file_path.exists() or not file_path.is_file():
+            raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+
         return FileResponse(
-            path=document.storage_key,
+            path=str(file_path),
             media_type=document.mime_type,
-            filename=f"{document.tipo_documento}.pdf"
-    )
+            filename=file_path.name
+        )
 
     def approval_reject_registration(self, body: UpdateStatusCadastro, id: int, db: Session):
         try:
