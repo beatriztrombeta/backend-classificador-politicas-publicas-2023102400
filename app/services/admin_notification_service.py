@@ -5,6 +5,7 @@ from app.services.approval_token_service import ApprovalTokenService
 from app.utils.email_templates import admin_document_review_email
 from app.utils.email_service import EmailService
 from app.repositories.user_repository import UserRepository
+from app.models.user_model import StatusCadastroEnum
 from app.config import settings
 
 
@@ -57,6 +58,9 @@ class AdminNotificationService:
             documents_links.append((d["tipo_documento"], view_link))
 
         for admin in admins:
+            if admin.status_cadastro != StatusCadastroEnum.APROVADO:
+                continue
+
             subject, body = admin_document_review_email(
                 admin_name=admin.nome,
                 user_name=pending_user.nome,

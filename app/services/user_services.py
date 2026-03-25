@@ -13,6 +13,7 @@ from app.schemas.user_schema import (
 from app.repositories.user_repository import UserRepository
 from app.models.user_model import StatusCadastroEnum, DocumentoUsuario
 from app.services.file_service import FileService
+from app.services.admin_notification_service import AdminNotificationService
 
 class UserService:
     
@@ -82,7 +83,12 @@ class UserService:
             )
 
             db.commit()
-            
+
+            try:
+                AdminNotificationService(db).notify_pending_user(created_user.id_usuario)
+            except Exception as notify_error:
+                print(f"Erro ao notificar admins sobre usuário pendente {created_user.id_usuario}: {notify_error}")
+
             return UserCreateResponse(
                 id=created_user.id_usuario,
                 email=user_data.email,
@@ -141,7 +147,7 @@ class UserService:
             raise HTTPException(
                 status_code=400,
                 detail="Professor deve informar ao menos uma disciplina"
-    )
+            )
 
         except Exception:
             db.rollback()
