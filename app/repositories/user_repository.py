@@ -48,8 +48,15 @@ class UserRepository:
     
     @staticmethod
     def get_admin_users(db: Session) -> list[User]:
-        """Busca todos os usuários administradores (categoria_usuario = 1)"""
-        return db.query(User).filter(User.id_categoria_usuario == 1).all()
+        """Busca apenas usuários administradores aprovados (categoria_usuario = 1)"""
+        return (
+            db.query(User)
+            .filter(
+                User.id_categoria_usuario == 1,
+                User.status_cadastro == StatusCadastroEnum.APROVADO
+            )
+            .all()
+        )
     
     @staticmethod
     def update_status(db: Session, user_id: int, new_status: str):
