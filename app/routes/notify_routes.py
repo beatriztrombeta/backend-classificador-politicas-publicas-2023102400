@@ -22,12 +22,3 @@ def reject_user_route(token: str, db: Session = Depends(get_db)):
 @router.get("/admin/document/view")
 def view_user_document_route(token: str, db: Session = Depends(get_db)):
     return view_user_document(token, db)
-
-@router.post("/admin/notify-pending/{user_id}")
-def notify_admin(user_id: int, db: Session = Depends(get_db)):
-    from app.services.admin_notification_service import AdminNotificationService
-
-    service = AdminNotificationService(db)
-    service.notify_pending_user(user_id)
-
-    return {"message": "Admins notificados com sucesso."}
