@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import get_db
 from app.utils.access_control import require_permission
 from app.schemas.permission_schema import Resource, Action, AccessScope
+from app.utils.evasion_risk import calculate_course_evasion_risk
+from app.schemas.evasion_risk_schema import CourseEvasionRiskResponse
 
 router = APIRouter(prefix="/cursos", tags=["Cursos"])
 
@@ -292,3 +294,24 @@ def students_by_curso(
     ).mappings().all()
 
     return {"items": [dict(r) for r in rows]}
+
+@router.get("/{curso_id}/risco-evasao", response_model=CourseEvasionRiskResponse)
+def course_evasion_risk(
+    curso_id: int,
+    high_risk_threshold: float = Query(0.7, ge=0, le=1),
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.REPORTS, Action.READ)),
+):
+    if not _can_access_course(db, scope, curso_id):
+        raise HTTPException(status_code=403, detail="Acesso negado ao curso.")
+
+    result = calculate_course_evasion_risk(
+        db=db,
+        curso_id=curso_id,
+        high_risk_threshold=high_risk_threshold
+    )
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Curso não encontrado.")
+
+    return result

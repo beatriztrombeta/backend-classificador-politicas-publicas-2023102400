@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from app.utils.evasion_risk import calculate_unidade_evasion_risk
+from app.schemas.evasion_risk_schema import UnidadeEvasionRiskResponse
 from app.database import get_db
 from app.utils.access_control import require_permission
 from app.schemas.permission_schema import Resource, Action, AccessScope
@@ -134,3 +136,38 @@ def courses_by_unidade(
     ).mappings().all()
 
     return {"items": [dict(r) for r in rows]}
+
+@router.get("/{unidade_id}/risco-evasao", response_model=UnidadeEvasionRiskResponse)
+def unidade_evasion_risk(
+    unidade_id: int,
+    high_risk_threshold: float = Query(0.7, ge=0, le=1),
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.REPORTS, Action.READ)),
+):
+    where, params = _unidade_scope_where(scope)
+    where.append("un.id_unidade = :uid")
+    params["uid"] = unidade_id
+
+    allowed = db.execute(
+        text(f"""
+            SELECT 1
+            FROM unidade un
+            WHERE {" AND ".join(where)}
+            LIMIT 1
+        """),
+        params,
+    ).first()
+
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Acesso negado à unidade.")
+
+    result = calculate_unidade_evasion_risk(
+        db=db,
+        unidade_id=unidade_id,
+        high_risk_threshold=high_risk_threshold
+    )
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Unidade não encontrada.")
+
+    return result
