@@ -1,6 +1,6 @@
 from fastapi import Depends, UploadFile, File, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 from typing import List
 from app.repositories.user_repository import UserRepository
 from app.schemas.user_schema import UserCreateForm, UserCreate, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
@@ -35,17 +35,23 @@ class UserController:
     ) -> UserCreateResponse:
         """
         Controller para criação de novo usuário
-        
-        Args:
-            form: Dados do formulário
-            file: Arquivo PDF enviado
-            db: Sessão do banco de dados
-            
-        Returns:
-            UserCreateResponse com dados do usuário criado
         """
         data = {k: v for k, v in vars(form).items() if v is not None}
-        user_data = TypeAdapter(UserCreate).validate_python(data)
+
+        try:
+            user_data = TypeAdapter(UserCreate).validate_python(data)
+        except ValidationError as e:
+            errors = e.errors()
+            first_error = errors[0] if errors else None
+
+            message = "Dados inválidos."
+            if first_error:
+                message = first_error.get("msg") or message
+
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=message,
+            )
 
         try:
             self.email_validation_service.validate(user_data.email)
