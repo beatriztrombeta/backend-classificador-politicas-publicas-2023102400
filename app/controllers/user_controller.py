@@ -4,7 +4,7 @@ from pydantic import TypeAdapter, ValidationError
 from typing import List
 from app.repositories.user_repository import UserRepository
 from app.schemas.user_schema import UserCreateForm, UserCreate, UserCreateResponse, UserResponse, DocumentResponse, UpdateStatusCadastro
-from app.services.user_services import UserService
+from app.services.user_service import UserService
 from app.utils.email_service import EmailService
 from app.services.email_validation_service import (
     EmailValidationService,
