@@ -64,6 +64,7 @@ docker-compose.dev.yml
 
 # Volumes, configs locais, dados persistentes
 postgres_data/
+data/
 pgdata/
 csvdata/
 files/
