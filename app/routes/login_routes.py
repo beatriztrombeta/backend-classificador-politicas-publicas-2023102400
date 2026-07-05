@@ -3,20 +3,21 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.utils.auth import get_current_user
 from app.models.user_model import User
-from app.controllers.auth_controller import (
-    send_login_code,
-    validate_login_code
-)
+from app.controllers.auth_controller import send_login_code, validate_login_code
 from app.schemas.login_schema import UserLogin, VerifyCode
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
 
 @router.post("/send-code")
 def send_code(data: UserLogin, db: Session = Depends(get_db)):
     return send_login_code(data.email, db)
 
+
 @router.post("/verify-code")
-def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Depends(get_db)):
+def verify_code_endpoint(
+    data: VerifyCode, response: Response, db: Session = Depends(get_db)
+):
     token_data = validate_login_code(data.email, data.code, db)
     token = token_data.get("access_token")
 
@@ -27,9 +28,9 @@ def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Dep
         key="token",
         value=token,
         httponly=True,
-        secure=False,
-        samesite="Lax",
-        max_age=3600
+        secure=True,
+        samesite="none",
+        max_age=3600,
     )
 
     return {
@@ -37,10 +38,12 @@ def verify_code_endpoint(data: VerifyCode, response: Response, db: Session = Dep
         "id_categoria_usuario": token_data.get("id_categoria_usuario"),
     }
 
+
 @router.post("/logout")
 def logout(response: Response):
     response.delete_cookie("token")
     return {"message": "Logout realizado com sucesso."}
+
 
 @router.get("/me")
 def me(current=Depends(get_current_user), db: Session = Depends(get_db)):

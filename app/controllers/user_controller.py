@@ -140,8 +140,8 @@ class UserController:
             key="signup_token",
             value=signup_token,
             httponly=True,
-            secure=False,
-            samesite="Lax",
+            secure=True,
+            samesite="none",
             max_age=20 * 60
         )
 
