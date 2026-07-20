@@ -7,8 +7,7 @@ from app.utils.access_control import require_permission
 from app.schemas.permission_schema import Resource, Action, AccessScope, RoleId
 from app.services.permission_service import PermissionService
 from app.services.xai_service import fetch_xai_from_db, generate_groq_summary
-from app.services.persona_service import fetch_high_risk_ids, aggregate_signals, population_stats
-from app.services.persona_service import generate_personas_with_groq, build_persona_inputs
+from app.services.persona_service import get_personas_cached
 
 router = APIRouter(prefix="/students", tags=["Alunos"])
 perm = PermissionService()
@@ -53,7 +52,7 @@ def get_student_detail(
                 SELECT
                     pf.id_aluno_graduacao,
                     jsonb_object_agg(
-                        UPPER(TRIM(pf.descricao)),
+                        UPPER(TRIM(pf.feature)),
                         pf.peso
                     ) AS impact
                 FROM peso_features pf
@@ -129,7 +128,7 @@ def list_students(
         WITH impactos AS (
             SELECT
                 pf.id_aluno_graduacao,
-                jsonb_object_agg(UPPER(TRIM(pf.descricao)), pf.peso) AS impact
+                jsonb_object_agg(UPPER(TRIM(pf.feature)), pf.peso) AS impact
             FROM peso_features pf
             GROUP BY pf.id_aluno_graduacao
         )
@@ -231,43 +230,20 @@ def get_high_risk_personas(
     if scope.role_id == RoleId.ALUNO:
         raise HTTPException(status_code=403, detail="Not allowed for this role")
 
-    ids = fetch_high_risk_ids(db, threshold=threshold, top_n=top_n)
-    pop = population_stats(db, threshold=threshold)
-
-    if not ids:
-        return {
-            "data": {
-                "population": pop,
-                "signals": {"top_risk_drivers": []},
-                "groups": [],
-                "personas": [],
-                "groq_error": None,
-            }
-        }
-
-    inputs = build_persona_inputs(
+    data, error, _stale = get_personas_cached(
         db=db,
-        high_risk_ids=ids,
         threshold=threshold,
+        top_n=top_n,
         personas_n=personas_n,
     )
 
-    signals = aggregate_signals(db, aluno_ids=ids)
+    if data is None:
+        raise HTTPException(
+            status_code=502,
+            detail=(error or {}).get("message", "Erro ao calcular personas de alto risco."),
+        )
 
-    personas, groq_error = generate_personas_with_groq(
-        payload=inputs,
-        personas_n=personas_n,
-    )
-
-    return {
-        "data": {
-            "population": inputs["population"],
-            "signals": {"top_risk_drivers": signals[:10]},
-            "groups": inputs["groups"],
-            "personas": personas,
-            "groq_error": groq_error,
-        }
-    }
+    return {"data": data}
 
 @router.get("/{aluno_id}/subjects")
 def get_student_subjects(

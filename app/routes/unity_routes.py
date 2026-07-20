@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.utils.evasion_risk import calculate_unidade_evasion_risk
+from app.utils.evasion_risk import calculate_unidade_evasion_risk, calculate_unidades_evasion_risk_batch
 from app.schemas.evasion_risk_schema import UnidadeEvasionRiskResponse
 from app.database import get_db
 from app.utils.access_control import require_permission
@@ -89,6 +89,34 @@ def list_unidades(
         u["courses"] = by_unidade.get(int(u["id_unidade"]), [])
 
     return {"items": unidades}
+
+
+@router.get("/risco-evasao")
+def unidades_evasion_risk_batch(
+    ids: str = Query(..., description="IDs de unidade separados por vírgula, ex: 1,2,3"),
+    high_risk_threshold: float = Query(0.7, ge=0, le=1),
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.REPORTS, Action.READ)),
+):
+    try:
+        unidade_ids = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Parâmetro 'ids' inválido: use números separados por vírgula.")
+
+    if not unidade_ids:
+        return {"items": []}
+
+    where, params = _unidade_scope_where(scope)
+
+    result_by_id = calculate_unidades_evasion_risk_batch(
+        db=db,
+        unidade_ids=unidade_ids,
+        high_risk_threshold=high_risk_threshold,
+        extra_where=where or None,
+        extra_params=params or None,
+    )
+
+    return {"items": list(result_by_id.values())}
 
 
 @router.get("/{unidade_id}/cursos")

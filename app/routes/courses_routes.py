@@ -5,10 +5,63 @@ from sqlalchemy import text
 from app.database import get_db
 from app.utils.access_control import require_permission
 from app.schemas.permission_schema import Resource, Action, AccessScope
-from app.utils.evasion_risk import calculate_course_evasion_risk
+from app.utils.evasion_risk import calculate_course_evasion_risk, calculate_courses_evasion_risk_batch
 from app.schemas.evasion_risk_schema import CourseEvasionRiskResponse
 
 router = APIRouter(prefix="/cursos", tags=["Cursos"])
+
+def _cursos_scope_where(scope: AccessScope):
+    """
+    Mesma lógica de escopo usada em list_cursos, reaproveitada pra query em lote.
+    Retorna (where, params), ou None se o usuário não tem acesso a curso nenhum.
+    """
+    where: list[str] = []
+    params: dict = {}
+    role = scope.role_id.name
+
+    if role == "ADMIN":
+        return where, params
+
+    if role == "COORD":
+        if not scope.curso_ids:
+            return None
+        where.append("c.id_curso = ANY(:scope_curso_ids)")
+        params["scope_curso_ids"] = list(scope.curso_ids)
+        return where, params
+
+    if role == "PROFESSOR":
+        if not scope.disciplina_ids:
+            return None
+        where.append("""
+            c.id_curso IN (
+                SELECT d.id_curso FROM disciplina d WHERE d.id_disciplina = ANY(:scope_disciplina_ids)
+            )
+        """)
+        params["scope_disciplina_ids"] = list(scope.disciplina_ids)
+        return where, params
+
+    if role == "ALUNO":
+        if not scope.aluno_ids:
+            return None
+        where.append("""
+            c.id_curso IN (
+                SELECT a.id_curso FROM aluno a WHERE a.id_aluno_graduacao = ANY(:scope_aluno_ids)
+            )
+        """)
+        params["scope_aluno_ids"] = list(scope.aluno_ids)
+        return where, params
+
+    if scope.unidade_ids:
+        where.append("c.id_unidade = ANY(:scope_unidade_ids)")
+        params["scope_unidade_ids"] = list(scope.unidade_ids)
+        return where, params
+
+    if scope.campus_ids:
+        where.append("u.id_campus = ANY(:scope_campus_ids)")
+        params["scope_campus_ids"] = list(scope.campus_ids)
+        return where, params
+
+    return None
 
 def _can_access_course(db: Session, scope: AccessScope, curso_id: int) -> bool:
     role = scope.role_id.name
@@ -242,7 +295,7 @@ def students_by_curso(
             WITH impactos AS (
                 SELECT
                     pf.id_aluno_graduacao,
-                    jsonb_object_agg(UPPER(TRIM(pf.descricao)), pf.peso) AS impact
+                    jsonb_object_agg(UPPER(TRIM(pf.feature)), pf.peso) AS impact
                 FROM peso_features pf
                 WHERE pf.id_aluno_graduacao IN (
                     SELECT a.id_aluno_graduacao
@@ -294,6 +347,42 @@ def students_by_curso(
     ).mappings().all()
 
     return {"items": [dict(r) for r in rows]}
+
+@router.get("/risco-evasao")
+def cursos_evasion_risk_batch(
+    ids: str = Query(..., description="IDs de curso separados por vírgula, ex: 1,2,3"),
+    high_risk_threshold: float = Query(0.7, ge=0, le=1),
+    db: Session = Depends(get_db),
+    scope: AccessScope = Depends(require_permission(Resource.REPORTS, Action.READ)),
+):
+    """
+    Versão em lote de /{curso_id}/risco-evasao: calcula todos os cursos pedidos em 1
+    única query, em vez do front precisar disparar 1 request por curso.
+    """
+    try:
+        curso_ids = [int(x) for x in ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Parâmetro 'ids' inválido: use números separados por vírgula.")
+
+    if not curso_ids:
+        return {"items": []}
+
+    scope_filter = _cursos_scope_where(scope)
+    if scope_filter is None:
+        return {"items": []}
+
+    where, params = scope_filter
+
+    result_by_id = calculate_courses_evasion_risk_batch(
+        db=db,
+        curso_ids=curso_ids,
+        high_risk_threshold=high_risk_threshold,
+        extra_where=where or None,
+        extra_params=params or None,
+    )
+
+    return {"items": list(result_by_id.values())}
+
 
 @router.get("/{curso_id}/risco-evasao", response_model=CourseEvasionRiskResponse)
 def course_evasion_risk(
