@@ -128,7 +128,7 @@ def generate_groq_summary(payload: Dict[str, Any]) -> Tuple[Optional[str], Optio
     if not api_key:
         return None, {"type": "missing_api_key", "message": "GROQ_API_KEY não encontrada no ambiente"}
 
-    model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
     neg = sanitize_features(payload["explanation"]["top_negative"])
     pos = sanitize_features(payload["explanation"]["top_positive"])
